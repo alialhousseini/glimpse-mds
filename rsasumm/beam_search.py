@@ -8,26 +8,33 @@ def compute_rsa_probas(
     logits: torch.Tensor, prior: torch.Tensor, rationality: float = 1.0
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    :param logits: (world_size, num_beam, vocab_size)
-    :param prior: (world_size, num_beam) for each beam the prior over the objects
-    :param rationality: rationality parameter, the higher the more rational ie the more the speaker will try to adapt
-    to the listener
-    :return: S1, L1: (world_size, num_beam, vocab_size).
-    S1[o, b, w] is the (log)probability of the word w given the object o and the current partial summary for the beam b
-    L1[o, b, w] is the (log)probability of the object o given the word w and the current partial summary for the beam b
+    Compute speaker (S1) and listener (L1) probabilities based on RSA reasoning.
+
+    Args:
+        logits (torch.Tensor): (world_size, num_beam, vocab_size).
+            Log probabilities of words for each object and beam.
+        prior (torch.Tensor): (world_size, num_beam).
+            Prior over objects for each beam.
+        rationality (float): Rationality parameter controlling how much the speaker adapts to the listener.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]:
+            - S1 (torch.Tensor): Speaker probabilities (world_size, num_beam, vocab_size).
+            - L1 (torch.Tensor): Listener probabilities (world_size, num_beam, vocab_size).
     """
 
-    prod = logits + prior[..., None]
+    prod = logits + prior[..., None]  # Add prior to logits
 
+    # Initial listener probabilities
     L0 = torch.nan_to_num(torch.log_softmax(prod, dim=0), nan=-float("inf"))
 
+    # Adjust logits based on listener probabilities and rationality
     prod_s = logits + L0 * rationality
-
-    S1 = torch.log_softmax(prod_s, dim=-1)
+    S1 = torch.log_softmax(prod_s, dim=-1)  # Speaker probabilities
     S1 = torch.nan_to_num(S1, nan=-float("inf"))
 
-    prod_l = logits + L0
-    L1 = torch.log_softmax(prod_l, dim=0)
+    prod_l = logits + L0  # Listener update
+    L1 = torch.log_softmax(prod_l, dim=0)  # Listener probabilities
     L1 = torch.nan_to_num(L1, nan=-float("inf"))
 
     return S1, L1
@@ -37,15 +44,21 @@ def sample_from_probs(
     logits: torch.Tensor, num_beams: torch.Tensor, do_sample: bool, K: int = 10
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
+    Sample or select top tokens from probabilities.
 
-    :param logits: (num_beams, vocab_size) log proba for the next token only for the wanted object
-    :param num_beams: number of beam to sample. (Can be different from the shape of logits since some beams might have
-    finished earlier)
-    :param do_sample: sample or use argmax
-    :param K: number of samples to draw per beam to create the new population
-    :return: idx_beam, idx_token, tokens_scores, the indices of the sampled tokens and their scores
+    Args:
+        logits (torch.Tensor): (num_beams, vocab_size).
+            Log probabilities of tokens for the next step.
+        num_beams (torch.Tensor): Number of beams to sample.
+        do_sample (bool): Whether to sample tokens or use argmax.
+        K (int): Number of samples to draw per beam.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            - idx_beam: Indices of sampled beams.
+            - idx_token: Indices of sampled tokens.
+            - tokens_scores: Log probabilities of sampled tokens.
     """
-
     vocab_size = logits.shape[-1]
     if do_sample:
         # sample from the probability distribution
@@ -109,7 +122,8 @@ class RSAContextualDecoding:
         with torch.no_grad():
             world_size, num_beams = input_ids.shape[0], decoder_input_ids.shape[1]
 
-            input_ids = input_ids.view(world_size * num_beams, input_ids.shape[2]).to(self.device)
+            input_ids = input_ids.view(
+                world_size * num_beams, input_ids.shape[2]).to(self.device)
             attention_mask = attention_mask.view(
                 world_size * num_beams, attention_mask.shape[2]
             ).to(self.device)
@@ -166,12 +180,14 @@ class RSAContextualDecoding:
         input_ids_mask = input_ids_mask.unsqueeze(1).repeat(1, num_beams, 1)
 
         # repeat interleave
-        decoder_input_ids = decoder_input_ids.repeat_interleave(self.world_size, dim=0)
+        decoder_input_ids = decoder_input_ids.repeat_interleave(
+            self.world_size, dim=0)
         decoder_input_ids_mask = decoder_input_ids_mask.repeat_interleave(
             self.world_size, dim=0
         )
 
-        decoder_input_ids = decoder_input_ids.view(self.world_size, num_beams, -1)
+        decoder_input_ids = decoder_input_ids.view(
+            self.world_size, num_beams, -1)
         decoder_input_ids_mask = decoder_input_ids_mask.view(
             self.world_size, num_beams, -1
         )
@@ -251,9 +267,11 @@ class RSAContextualDecoding:
 
         if do_sample and process_logits_before_rsa:
             if top_p is not None:
-                logits = TopPLogitsWarper(top_p=top_p)(input_ids=None, scores=logits)
+                logits = TopPLogitsWarper(top_p=top_p)(
+                    input_ids=None, scores=logits)
             if top_k is not None:
-                logits = TopKLogitsWarper(top_k=top_k)(input_ids=None, scores=logits)
+                logits = TopKLogitsWarper(top_k=top_k)(
+                    input_ids=None, scores=logits)
 
         logits = logits.view(world_size, num_beams, -1)
 
@@ -261,15 +279,18 @@ class RSAContextualDecoding:
             logits = logits + beam_scores[None, ..., None]
 
         # compute the RSA probabilities
-        S1, L1 = compute_rsa_probas(logits, self.prior, rationality=rationality)
+        S1, L1 = compute_rsa_probas(
+            logits, self.prior, rationality=rationality)
         logits = S1
 
         if do_sample and not process_logits_before_rsa:
             logits = logits.view(world_size * num_beams, -1)
             if top_p is not None:
-                logits = TopPLogitsWarper(top_p=top_p)(input_ids=None, scores=logits)
+                logits = TopPLogitsWarper(top_p=top_p)(
+                    input_ids=None, scores=logits)
             if top_k is not None:
-                logits = TopKLogitsWarper(top_k=top_k)(input_ids=None, scores=logits)
+                logits = TopKLogitsWarper(top_k=top_k)(
+                    input_ids=None, scores=logits)
 
             logits = logits.view(world_size, num_beams, -1)
 
@@ -308,7 +329,8 @@ class RSAContextualDecoding:
         self.num_beam = num_beams
         self.world_size = source_texts_ids.shape[0]
 
-        self.prior = torch.ones((self.world_size, self.num_beam)).to(self.device) / self.world_size
+        self.prior = torch.ones((self.world_size, self.num_beam)).to(
+            self.device) / self.world_size
         beam_scores = torch.zeros(self.num_beam).to(self.device)
 
         # initialize the decoder input ids
@@ -320,7 +342,8 @@ class RSAContextualDecoding:
         )
 
         # initialize the decoder attention mask
-        decoder_attention_mask = torch.ones_like(decoder_input_ids).to(self.device)
+        decoder_attention_mask = torch.ones_like(
+            decoder_input_ids).to(self.device)
 
         new_beams = []
         finished_beams = []
@@ -386,7 +409,8 @@ class RSAContextualDecoding:
             max_beam_len = max(len(x[0]) for x in new_beams)
             new_beams = [
                 (
-                    x[0] + [self.tokenizer.pad_token_id] * (max_beam_len - len(x[0])),
+                    x[0] + [self.tokenizer.pad_token_id] *
+                    (max_beam_len - len(x[0])),
                     x[1],
                     x[2],
                 )
@@ -394,7 +418,8 @@ class RSAContextualDecoding:
             ]
 
             # update the beam scores
-            beam_scores = torch.tensor([x[1] for x in new_beams]).to(self.device)
+            beam_scores = torch.tensor(
+                [x[1] for x in new_beams]).to(self.device)
 
             # update the decoder input ids
             decoder_input_ids: torch.Tensor = torch.tensor(
@@ -406,7 +431,8 @@ class RSAContextualDecoding:
                 decoder_input_ids != self.tokenizer.pad_token_id
             ).long()
 
-            self.prior = torch.stack([x[2] for x in new_beams], dim=1).to(self.device)
+            self.prior = torch.stack(
+                [x[2] for x in new_beams], dim=1).to(self.device)
 
             # self.prior = torch.ones((self.world_size, len(new_beams))) / self.world_size
 
@@ -417,13 +443,15 @@ class RSAContextualDecoding:
         for x in finished_beams + new_beams:
             results.append(
                 (
-                    x[0] + [self.tokenizer.pad_token_id] * (max_beam_len - len(x[0])),
+                    x[0] + [self.tokenizer.pad_token_id] *
+                    (max_beam_len - len(x[0])),
                     x[1],
                     x[2],
                 )
             )
 
-        decoder_input_ids = torch.tensor([x[0] for x in results], device=self.device)
+        decoder_input_ids = torch.tensor(
+            [x[0] for x in results], device=self.device)
 
         beam_scores = torch.tensor([x[1] for x in results]).to(self.device)
 

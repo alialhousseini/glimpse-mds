@@ -1,3 +1,9 @@
+'''Another example of gradio app where latex is colored based on the score of the sentence'''
+import matplotlib.pyplot as plt
+import pandas as pd
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import gradio as gr
+from rsasumm.rsa_reranker import RSAReranking
 import math
 from typing import List, Tuple
 
@@ -5,15 +11,11 @@ import nltk
 import numpy as np
 import seaborn as sns
 
-import sys, os.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+import sys
+import os.path
+sys.path.append(os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '../..')))
 
-from rsasumm.rsa_reranker import RSAReranking
-import gradio as gr
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import seaborn as sns
-import pandas as pd
-import matplotlib.pyplot as plt
 
 MODEL = "facebook/bart-large-cnn"
 
@@ -50,7 +52,7 @@ EXAMPLES = [
 ]
 
 
-def make_colored_text_to_latex(scored_texts : List[Tuple[str, float]]):
+def make_colored_text_to_latex(scored_texts: List[Tuple[str, float]]):
     """
     Make a latex string from a list of scored texts.
     """
@@ -63,15 +65,15 @@ def make_colored_text_to_latex(scored_texts : List[Tuple[str, float]]):
     cmap = sns.diverging_palette(250, 30, l=50, center="dark", as_cmap=True)
     hex_colors = [cmap(score)[0:3] for score in scores]
     # make html color string
-    hex_colors = [",".join([str(round(x, 2)) for x in color]) for color in hex_colors]
+    hex_colors = [",".join([str(round(x, 2)) for x in color])
+                  for color in hex_colors]
     # make latex string
     latex_string = ""
     for (text, score), hex_color in zip(scored_texts, hex_colors):
-        latex_string += "\\textcolor[rgb]{" + str(hex_color) + "}{" + text + "} "
+        latex_string += "\\textcolor[rgb]{" + \
+            str(hex_color) + "}{" + text + "} "
 
     return latex_string
-
-
 
 
 def summarize(text1, text2, text3, iterations, rationality=1.0):
@@ -81,11 +83,13 @@ def summarize(text1, text2, text3, iterations, rationality=1.0):
     text2_sentences = nltk.sent_tokenize(text2)
     text3_sentences = nltk.sent_tokenize(text3)
 
-
     # remove empty sentences
-    text1_sentences = [sentence for sentence in text1_sentences if sentence != ""]
-    text2_sentences = [sentence for sentence in text2_sentences if sentence != ""]
-    text3_sentences = [sentence for sentence in text3_sentences if sentence != ""]
+    text1_sentences = [
+        sentence for sentence in text1_sentences if sentence != ""]
+    text2_sentences = [
+        sentence for sentence in text2_sentences if sentence != ""]
+    text3_sentences = [
+        sentence for sentence in text3_sentences if sentence != ""]
 
     sentences = list(set(text1_sentences + text2_sentences + text3_sentences))
 
@@ -109,7 +113,7 @@ def summarize(text1, text2, text3, iterations, rationality=1.0):
     ) = rsa_reranker.rerank(t=iterations)
 
     # apply exp to the probabilities
-    speaker_df = speaker_df.applymap(lambda x: math.exp(x))
+    speaker_df = speaker_df.map(lambda x: math.exp(x))
 
     text_1_summaries = speaker_df.loc[text1][text1_sentences]
     text_1_summaries = text_1_summaries / text_1_summaries.sum()
@@ -121,21 +125,29 @@ def summarize(text1, text2, text3, iterations, rationality=1.0):
     text_3_summaries = text_3_summaries / text_3_summaries.sum()
 
     # make list of tuples
-    text_1_summaries = [(sentence, text_1_summaries[sentence]) for sentence in text1_sentences]
-    text_2_summaries = [(sentence, text_2_summaries[sentence]) for sentence in text2_sentences]
-    text_3_summaries = [(sentence, text_3_summaries[sentence]) for sentence in text3_sentences]
+    text_1_summaries = [(sentence, text_1_summaries[sentence])
+                        for sentence in text1_sentences]
+    text_2_summaries = [(sentence, text_2_summaries[sentence])
+                        for sentence in text2_sentences]
+    text_3_summaries = [(sentence, text_3_summaries[sentence])
+                        for sentence in text3_sentences]
 
     # normalize consensuality scores between -1 and 1
 
-    consensuality_scores = (consensuality_scores - (consensuality_scores.max() - consensuality_scores.min()) / 2) / (consensuality_scores.max() - consensuality_scores.min()) / 2
-    consensuality_scores_01 = (consensuality_scores - consensuality_scores.min()) / (consensuality_scores.max() - consensuality_scores.min())
+    consensuality_scores = (consensuality_scores - (consensuality_scores.max() - consensuality_scores.min()
+                                                    ) / 2) / (consensuality_scores.max() - consensuality_scores.min()) / 2
+    consensuality_scores_01 = (consensuality_scores - consensuality_scores.min()) / (
+        consensuality_scores.max() - consensuality_scores.min())
 
+    most_consensual = consensuality_scores.sort_values(
+        ascending=True).head(3).index.tolist()
+    least_consensual = consensuality_scores.sort_values(
+        ascending=False).head(3).index.tolist()
 
-    most_consensual = consensuality_scores.sort_values(ascending=True).head(3).index.tolist()
-    least_consensual = consensuality_scores.sort_values(ascending=False).head(3).index.tolist()
-
-    most_consensual = [(sentence, consensuality_scores[sentence]) for sentence in most_consensual]
-    least_consensual = [(sentence, consensuality_scores[sentence]) for sentence in least_consensual]
+    most_consensual = [(sentence, consensuality_scores[sentence])
+                       for sentence in most_consensual]
+    least_consensual = [(sentence, consensuality_scores[sentence])
+                        for sentence in least_consensual]
 
     text_1_consensuality = consensuality_scores.loc[text1_sentences]
     text_2_consensuality = consensuality_scores.loc[text2_sentences]
@@ -146,9 +158,12 @@ def summarize(text1, text2, text3, iterations, rationality=1.0):
     # text_2_consensuality = (text_2_consensuality - (text_2_consensuality.max() - text_2_consensuality.min()) / 2) / (text_2_consensuality.max() - text_2_consensuality.min()) / 2
     # text_3_consensuality = (text_3_consensuality - (text_3_consensuality.max() - text_3_consensuality.min()) / 2) / (text_3_consensuality.max() - text_3_consensuality.min()) / 2
 
-    text_1_consensuality = [(sentence, text_1_consensuality[sentence]) for sentence in text1_sentences]
-    text_2_consensuality = [(sentence, text_2_consensuality[sentence]) for sentence in text2_sentences]
-    text_3_consensuality = [(sentence, text_3_consensuality[sentence]) for sentence in text3_sentences]
+    text_1_consensuality = [(sentence, text_1_consensuality[sentence])
+                            for sentence in text1_sentences]
+    text_2_consensuality = [(sentence, text_2_consensuality[sentence])
+                            for sentence in text2_sentences]
+    text_3_consensuality = [(sentence, text_3_consensuality[sentence])
+                            for sentence in text3_sentences]
 
     fig1 = plt.figure(figsize=(20, 10))
     ax = fig1.add_subplot(111)
@@ -192,18 +207,23 @@ def summarize(text1, text2, text3, iterations, rationality=1.0):
     text_2_consensuality_ = consensuality_scores_01.loc[text2_sentences]
     text_3_consensuality_ = consensuality_scores_01.loc[text3_sentences]
 
-    text_1_consensuality_ = [(sentence, text_1_consensuality_[sentence]) for sentence in text1_sentences]
-    text_2_consensuality_ = [(sentence, text_2_consensuality_[sentence]) for sentence in text2_sentences]
-    text_3_consensuality_ = [(sentence, text_3_consensuality_[sentence]) for sentence in text3_sentences]
+    text_1_consensuality_ = [(sentence, text_1_consensuality_[
+                              sentence]) for sentence in text1_sentences]
+    text_2_consensuality_ = [(sentence, text_2_consensuality_[
+                              sentence]) for sentence in text2_sentences]
+    text_3_consensuality_ = [(sentence, text_3_consensuality_[
+                              sentence]) for sentence in text3_sentences]
 
-    latex_text_1_consensuality = make_colored_text_to_latex(text_1_consensuality_)
-    latex_text_2_consensuality = make_colored_text_to_latex(text_2_consensuality_)
-    latex_text_3_consensuality = make_colored_text_to_latex(text_3_consensuality_)
-    
+    latex_text_1_consensuality = make_colored_text_to_latex(
+        text_1_consensuality_)
+    latex_text_2_consensuality = make_colored_text_to_latex(
+        text_2_consensuality_)
+    latex_text_3_consensuality = make_colored_text_to_latex(
+        text_3_consensuality_)
+
     latex = latex_template.replace("[REVIEW 1]", latex_text_1)
     latex = latex.replace("[REVIEW 2]", latex_text_2)
     latex = latex.replace("[REVIEW 3]", latex_text_3)
-
 
     return text_1_summaries, text_2_summaries, text_3_summaries, text_1_consensuality, text_2_consensuality, text_3_consensuality, most_consensual, least_consensual, fig1, fig2, latex
 
@@ -218,7 +238,8 @@ iface = gr.Interface(
         gr.Textbox(lines=10, value=EXAMPLES[1]),
         gr.Textbox(lines=10, value=EXAMPLES[2]),
         gr.Number(value=1, label="Iterations"),
-        gr.Slider(minimum=0.0, maximum=10.0, step=0.1, value=1.0, label="Rationality"),
+        gr.Slider(minimum=0.0, maximum=10.0, step=0.1,
+                  value=1.0, label="Rationality"),
     ],
     outputs=[
         gr.Highlightedtext(

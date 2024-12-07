@@ -15,7 +15,7 @@ slurm*
 __pycache__/
 *.py[cod]
 *$py.class
-
+/rsasumm/compute_rsa.py
 # C extensions
 *.so
 
