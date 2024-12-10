@@ -59,13 +59,15 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="")
     # method
-    parser.add_argument("--method", type=str, choices=['LSA', 'text-rank', 'lex-rank', 'edmundson', 'luhn', 'kl-sum', 'random', 'reduction'], default="LSA")
+    parser.add_argument("--method", type=str, choices=[
+                        'LSA', 'text-rank', 'lex-rank', 'edmundson', 'luhn', 'kl-sum', 'random', 'reduction'], default="LSA")
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--output", type=Path, default="")
 
     args = parser.parse_args()
     return args
+
 
 def prepare_dataset(dataset_name, dataset_path="rsasumm/data/processed/"):
     dataset_path = Path(dataset_path)
@@ -79,7 +81,6 @@ def prepare_dataset(dataset_name, dataset_path="rsasumm/data/processed/"):
         dataset = pd.read_csv(dataset_path / "test_metareviews.csv")
     else:
         raise ValueError(f"Unknown dataset {dataset_name}")
-
 
     return dataset
 
@@ -126,4 +127,4 @@ def main():
         dataset.to_csv(path, index=True)
 
 
-main()
+# main()
