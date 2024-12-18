@@ -9,14 +9,17 @@ from tqdm import tqdm
 import nltk
 import os
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    
-    parser.add_argument("--dataset_path", type=Path, default="data/processed/all_reviews_2017.csv")
+
+    parser.add_argument("--dataset_path", type=Path,
+                        default="data/processed/all_reviews_2017.csv")
     parser.add_argument("--output_dir", type=str, default="data/candidates")
-    
+
     # if ran in a scripted way, the output path will be printed
-    parser.add_argument("--scripted-run", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--scripted-run", action=argparse.BooleanOptionalAction, default=False)
 
     # limit the number of samples to generate
     parser.add_argument("--limit", type=int, default=None)
@@ -27,7 +30,7 @@ def parse_args():
 
 
 def prepare_dataset(dataset_path) -> Dataset:
-    
+
     try:
         dataset = pd.read_csv(dataset_path)
     except:
@@ -52,10 +55,10 @@ def evaluate_summarizer(dataset: Dataset) -> Dataset:
     summaries = []
     print("Generating summaries...")
 
-    # (tqdm library for progress bar) 
+    # (tqdm library for progress bar)
     for sample in tqdm(dataset):
-        text = sample["text"] 
-        
+        text = sample["text"]
+
         text = text.replace('-----', '\n')
         sentences = nltk.sent_tokenize(text)
         # remove empty sentences
@@ -63,6 +66,7 @@ def evaluate_summarizer(dataset: Dataset) -> Dataset:
 
         summaries.append(sentences)
 
+    print(summaries)
     # add summaries to the huggingface dataset
     dataset = dataset.map(lambda example: {"summary": summaries.pop(0)})
 
@@ -105,9 +109,10 @@ def main():
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
     df_dataset.to_csv(output_path, index=False, encoding="utf-8")
-    
+
     # in case of scripted run, print the output path
-    if args.scripted_run: print(output_path)
+    if args.scripted_run:
+        print(output_path)
 
 
 if __name__ == "__main__":
