@@ -1,13 +1,11 @@
 
-from pathlib import Path
-
-import pandas as pd
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import argparse
-from tqdm import tqdm
-
-import sys
 import os.path
+import sys
+from tqdm import tqdm
+import argparse
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import pandas as pd
+from pathlib import Path
 sys.path.append(os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../..')))
 
@@ -20,7 +18,7 @@ def parse_args():
                         default="facebook/bart-large-cnn")
     parser.add_argument("--summaries", type=Path, default="")
     parser.add_argument("--output_dir", type=str, default="output")
-
+    parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--filter", type=str, default=None)
 
     parser.add_argument("--device", type=str, default="cuda")
@@ -28,8 +26,11 @@ def parse_args():
     return parser.parse_args()
 
 
-def parse_summaries(path: Path) -> pd.DataFrame:
+def parse_summaries(path: Path, limit: int) -> pd.DataFrame:
     summaries = pd.read_csv(path)
+
+    if limit is not None:
+        summaries = summaries.head(limit)
 
     # check if the dataframe has the right columns
     if not all(col in summaries.columns for col in ["id", "text", "id_candidate", "summary"]):
@@ -44,9 +45,9 @@ def reranking_rsa(summaries: pd.DataFrame, model, tokenizer, device):
     best_summaries = []
     best_bases = []
     for name, group in tqdm(summaries.groupby(["id"])):
-        rsa_reranker = RSAReranking(model, tokenizer, device, group.summary.unique(
-        ).tolist(), group.text.unique().tolist())
-        best_rsa, best_base, speaker_df, listener_df, initial_listener, language_model_proba_df = rsa_reranker.rerank(
+        rsa_reranker = RSAReranking(model, tokenizer, group.summary.unique(
+        ).tolist(), group.text.unique().tolist(), 32, 1, device)
+        best_rsa, best_base, speaker_df, listener_df, initial_listener, _, _, language_model_proba_df = rsa_reranker.rerank(
             t=3)
 
         group = group.set_index("summary")
@@ -110,7 +111,7 @@ def main():
     model = model.to(args.device)
 
     # load the summaries
-    summaries = parse_summaries(args.summaries)
+    summaries = parse_summaries(args.summaries, args.limit)
 
     # rerank the summaries
     best_summaries, bast_base = reranking_rsa(

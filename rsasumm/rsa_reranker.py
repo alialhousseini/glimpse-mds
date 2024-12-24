@@ -73,6 +73,8 @@ class RSAReranking:
         self.batch_size = batch_size
         self.rationality = rationality
 
+        self.model.to(self.device)
+
     def compute_conditionned_likelihood(
             self, x: List[str], y: List[str], mean: bool = True
     ) -> torch.Tensor:
@@ -93,14 +95,16 @@ class RSAReranking:
         loss_fn = torch.nn.CrossEntropyLoss(reduction="none")
 
         # Tokenize the source texts (x) and summaries (y)
-        x = self.tokenizer(x, return_tensors="pt",
-                           padding=True, truncation=True)
-        y = self.tokenizer(y, return_tensors="pt",
-                           padding=True, truncation=True)
+        x = self.tokenizer(x, return_tensors="pt", padding=True,
+                           truncation=True).to(self.device)
+        y = self.tokenizer(y, return_tensors="pt", padding=True,
+                           truncation=True).to(self.device)
 
         # Extract token IDs for input and output
         x_ids = x.input_ids.to(self.device)
         y_ids = y.input_ids.to(self.device)
+        x_attention_mask = x.attention_mask.to(self.device)
+        y_attention_mask = y.attention_mask.to(self.device)
         # print(x_ids.shape, y_ids.shape) -> (1, 7) (1, 7)
         # print(x_ids) -> tensor([[0,133,2225,16,2679,4,2]])
 
@@ -108,8 +112,8 @@ class RSAReranking:
         logits = self.model(
             input_ids=x_ids,
             decoder_input_ids=y_ids,
-            attention_mask=x.attention_mask.to(self.device),
-            decoder_attention_mask=y.attention_mask.to(self.device),
+            attention_mask=x_attention_mask,
+            decoder_attention_mask=y_attention_mask,
         ).logits
 
         # print(logits.shape) -> (1, 7, 50265)
@@ -156,20 +160,18 @@ class RSAReranking:
         Returns:
             torch.Tensor: Likelihood matrix of shape (len(source_texts), len(candidates)).
         """
-        
+
         # initialize the likelihood matrix of size (len(source_texts), len(candidates))
         likelihood_matrix = torch.zeros(
             (len(self.source_texts), len(self.candidates))
         ).to(self.device)
-        
-        
+
         # create a list of pairs (i: index source, j: index candidate, source_text, candidate)
         pairs = []
         for i, source_text in enumerate(self.source_texts):
             for j, candidate in enumerate(self.candidates):
                 pairs.append((i, j, source_text, candidate))
 
-        # split the pairs into batches
         batches = [
             pairs[i: i + self.batch_size]
             for i in range(0, len(pairs), self.batch_size)
