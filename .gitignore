@@ -3,6 +3,7 @@
 
 # GLIMPSE
 #  Ignore all the data except orignial files
+un*.py
 data/*
 !data/
 summaries/
