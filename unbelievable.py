@@ -9,6 +9,11 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
 from typing import List, Dict
 import nltk
+from rsasumm.rsa_reranker import RSAReranking
+import pickle
+import re
+from functools import reduce
+import operator
 ########################################################################
 
 
@@ -21,8 +26,6 @@ class RSAReranking2:
             self,
             model,
             model_type: str,
-            candidates: List[str],
-            source_texts: List[str],
             batch_size: int = 32,
             rationality: int = 1,
             device="cuda",
@@ -37,9 +40,6 @@ class RSAReranking2:
         :param device: device used to compute the likelihoods
         """
         self.device = device
-
-        self.candidates = candidates
-        self.source_texts = source_texts
 
         self.batch_size = batch_size
         self.rationality = rationality
@@ -185,12 +185,17 @@ class RSAReranking2:
 
         # Compute cosine similarity
         return torch.nn.functional.cosine_similarity(x_embeddings, y_embeddings)
+
+
 ########################################################################
 
 
 class SummaryGenerator:
 
-    def __init__(self, model_name: str, model, tokenizer, device="cuda"):
+    model = AutoModelForSeq2SeqLM.from_pretrained("facebook/bart-large-cnn")
+    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
+
+    def __init__(self, model_name: str = 'BART', model=model, tokenizer=tokenizer, device="cuda"):
         self.model_name = model_name
         self.model = model
         self.tokenizer = tokenizer
@@ -295,7 +300,7 @@ class SummaryGenerator:
 
         return dataset
 
-    def generate_abstractive_summary(self, dataset_path: Path, batch_size: int, trimming: bool):
+    def generate_extractive_summary(self, dataset_path: Path, batch_size: int, trimming: bool):
         self.tokenizer.pad_token = self.tokenizer.unk_token
         self.tokenizer.pad_token_id = self.tokenizer.unk_token_id
 
@@ -308,16 +313,15 @@ class SummaryGenerator:
         df_dataset = df_dataset.reset_index()
         # add an idx with  the id of the summary for each example
         df_dataset['id_candidate'] = df_dataset.groupby(['index']).cumcount()
-        now = datetime.datetime.now()
-        date = now.strftime("%Y-%m-%d-%H-%M-%S")
-        output_path = f"data/candidates/{self.model_name}_{dataset_path.stem}_{date}_extr.csv"
+
+        output_path = f"data/candidates/{self.model_name}_{dataset_path.stem}_-_extr.csv"
         # create output dir if it doesn't exist
         if not output_path.parent.exists():
             output_path.parent.mkdir(parents=True, exist_ok=True)
         df_dataset.to_csv(output_path, index=False, encoding="utf-8")
         print('done')
 
-    def generate_extractive_summary(self, dataset_path: Path, batch_size: int, trimming: bool):
+    def generate_abstractive_summary(self, dataset_path: Path):
         try:
             dataset = pd.read_csv(dataset_path)
         except:
@@ -332,10 +336,32 @@ class SummaryGenerator:
         for sample in tqdm(dataset):
             text = sample["text"]
 
-            text = text.replace('-----', '\n')
+            # Replace any set of successive dashes (e.g., --, ----, -----) with a newline
+            text = re.sub(r'-{2,}', '\n', text)
+
+            # Remove patterns like ".2-" or isolated numerics with hyphens
+            text = re.sub(r'\.\d+-', '', text)
+
+            # Replace multiple newlines or spaces with a single newline or space
+            # Replace multiple newlines with one
+            text = re.sub(r'\n+', '\n', text)
+            # Replace multiple spaces with one
+            text = re.sub(r'\s+', ' ', text)
+
+            # Remove any remaining unwanted characters (e.g., control characters)
+            # Remove non-ASCII characters
+            text = re.sub(r'[^\x00-\x7F]+', '', text)
+
+            # To be discussed
+            text = text.replace("\n", " ")
+
             sentences = nltk.sent_tokenize(text)
+
             # remove empty sentences
             sentences = [sentence for sentence in sentences if sentence != ""]
+
+            # Filter out short or meaningless sentences
+            sentences = [sent for sent in sentences if len(sent) > 8]
 
             summaries.append(sentences)
 
@@ -348,12 +374,257 @@ class SummaryGenerator:
         # add an idx with  the id of the summary for each example
         df_dataset["id_candidate"] = df_dataset.groupby(["index"]).cumcount()
 
-        now = datetime.datetime.now()
-        date = now.strftime("%Y-%m-%d-%H-%M-%S")
-        output_path = f"data/candidates/{self.model_name}_{dataset_path.stem}_{date}_abstr.csv"
+        output_path = f"data/candidatess/{dataset_path.stem}_-_abstr.csv"
+        output_path = Path(output_path)
         # create output dir if it doesn't exist
         if not output_path.parent.exists():
             output_path.parent.mkdir(parents=True, exist_ok=True)
         df_dataset.to_csv(output_path, index=False, encoding="utf-8")
         print('done')
+
+    def change_model(self, model_name, model, tokenizer):
+        self.model_name = model_name
+        self.model = model
+        self.tokenizer = tokenizer
+########################################################################
+
+
+# # Iterate over the dataset and generate (extractive) summaries first
+# path_original_dataset = Path("data/processed")
+
+# model_for_extractive = {
+#     'model_1':
+#         {
+#             'model_id': "facebook/bart-large-cnn",
+#             'model_name': "BART"
+
+#         },
+#     'model_2':
+#         {
+#             'model_id': "google/pegasus-large",
+#             'model_name': "PEGASUS"
+#         },
+# }
+
+
+# # Load the model and tokenizer
+# model = AutoModelForSeq2SeqLM.from_pretrained(
+#     model_for_extractive["model_1"]['model_id'])
+# tokenizer = AutoTokenizer.from_pretrained(
+#     model_for_extractive["model_1"]['model_id'])
+# model_name = model_for_extractive["model_1"]['model_name']
+
+# # Initialize the SummaryGenerator
+# sg = SummaryGenerator()
+# for model_count, (model_id, model_name) in model_for_extractive.items():
+
+#     # Adjust SG params
+#     model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+#     tokenizer = AutoTokenizer.from_pretrained(model_id)
+#     sg.change_model(model_name, model, tokenizer)
+
+#     # Iterate over the datasets
+#     for file in path_original_dataset.glob('*.csv'):
+
+#         # Generate extractive summaries for this dataset
+#         sg.generate_extractive_summary(file, 8, True)
+
+
+# # Once all extractive summaries are generated, generate abstractive summaries
+# for file in path_original_dataset.glob('*.csv'):
+#     sg.generate_abstractive_summary(file)
+
+# # By this we generated all abstractive and extractive summaries for all our datasets
+# ########################################################################
+
+
+# Now we can generate for each dataset LM_probas
+# Iterate over the generated summaries and compute the likelihoods
+# Save data in appropriate format
+
+# model_for_likelihood_computation = {
+#     'model_1':
+#         {
+#             'model_id': "facebook/bart-large-cnn",
+#             'model_name': "BART"
+#         },
+#     'model_2':
+#         {
+#             'model_id': "google/pegasus-large",
+#             'model_name': "PEGASUS"
+#         },
+# }
+
+# path_candidates = Path("data/candidatess")
+# for model_count, model_info in model_for_likelihood_computation.items():
+#     # Load the model and tokenizer
+#     model_id = model_info['model_id']
+#     model_name = model_info['model_name']
+#     model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+#     tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+#     for file in path_candidates.glob('*.csv'):
+#         # For each dataset we want to do the following
+#         # Extract LM_probas for each dataframe
+#         # Save them in a pkl file for each 'paper' (id)
+#         # Save the pkl files in a folder named after the dataset and the model used
+
+#         results = []
+#         curr_ds = pd.read_csv(file)
+
+#         # Name is a tuple e.g. ('id_name',)
+#         # group is a GroupedByKey DataFrame
+
+#         for name, group in tqdm(curr_ds.groupby(["id"])):
+
+#             rsa_reranker = RSAReranking(
+#                 model,  # model on which we want to compute the RSA
+#                 tokenizer,  # tokenizer for the model
+#                 device='cuda',
+#                 candidates=group.summary.unique().tolist(),
+#                 source_texts=group.text.unique().tolist(),
+#                 batch_size=32,
+#                 rationality=1,
+#             )
+#             # print(len(group.summary.unique().tolist()))
+#             # print(len(group.text.unique().tolist()))
+#             lm_probas = rsa_reranker.likelihood_matrix()
+#             # print(lm_probas.shape)
+#             lm_probas = lm_probas.cpu().numpy()
+#             lm_probas_df = pd.DataFrame(lm_probas)
+#             lm_probas_df.index = group.text.unique().tolist()
+#             lm_probas_df.columns = group.summary.unique().tolist()
+#             gold = group['gold'].tolist()[0]
+
+#             results.append(
+#                 {
+#                     "id": name,
+#                     "language_model_proba_df": lm_probas_df,
+#                     "gold": gold,
+#                     "rationality": 1,  # hyperparameter
+#                     "text_candidates": group
+#                 }
+#             )
+
+#         # Save the results
+#         opt_dir = Path(f'data/lm_probas/')
+#         if not opt_dir.exists():
+#             opt_dir.mkdir(parents=True, exist_ok=True)
+
+#         opt_path = Path(f"data/lm_probas/{file.stem}-_-{model_name}.pkl")
+#         results = {"results": results}
+#         with open(opt_path, 'wb') as f:
+#             pickle.dump(results, f)
+
+
+########################################################################
+
+def elementwise_max(dfs):
+    """
+    dfs: list of DataFrames (same index/columns)
+    """
+    return reduce(lambda x, y: x.combine(y, func=max), dfs)
+
+# Now we can write a script that takes the set of LM_probas for each dataset and (set) of models
+# and aggregate them to get the final ranking
+
+# We define a set of model names, this set represents the set of models we want to aggregate their results
+# In addition we define a methodology of aggregation(e.g. mean, max, weighted_avg, etc.)
+
+
+model_names = ["BART", "PEGASUS"]
+
+# We need to find for each set of common datasets, the models we are looking for:
+lm_probas_path = Path("data/lm_probas")
+lm_probas_files = list(lm_probas_path.glob("*.pkl"))
+# Filter out the files that do not contain the models we are looking for
+# So we keep only the files that contain the models we are looking for
+lm_probas_files = [file for file in lm_probas_files if any(
+    model_name in file.stem.split('-_-')[-1] for model_name in model_names)]
+
+# Now for each file, we collect filenames together to be processed
+files_and_pickles = {}
+for file in lm_probas_files:
+    filename = file.stem.split('-_-')[0]
+    if filename not in files_and_pickles:
+        files_and_pickles[filename] = [file]
+    else:
+        files_and_pickles[filename].append(file)
+
+method = "mean"
+
+# Now we can aggregate the results
+# We will aggregate the results for each dataset
+for filename, files in files_and_pickles.items():
+    # We iterate over the dict
+    # filename is the name of the dataset
+    # files is a list of paths to the pkl files
+
+    # Load the results for each model
+    pkls = [pd.read_pickle(f) for f in files]
+    # Go to results
+    pkls = [f['results'] for f in pkls]
+    # Now pkls is a list of lists of dictionaries [ [{},{},{}], [{},{},{}], ...]
+    # We want to access the language_model_proba_df for each dictionary in parallel
+    # i.e. [ [{a1},{b1},{c1}], [{a2},{b2},{c2}], ...] -> [ {a_i}, {b_i}, {c_i} ]
+
+    # Results
+    results = []
+    for i in range(len(pkls[0])):  # iterate over the dictionaries
+        # index 'i' is shared
+        set_of_dicts = [pkls[j][i] for j in range(len(pkls))]
+        # set_of_dicts is a list of dictionaries that share the same index
+        # [{a1}, {a2}, {a3}, ...]
+        # Now we want to aggregate the language_model_proba_df for each dictionary
+        new_dict = {}
+        new_dict['id'] = set_of_dicts[0]['id']
+        new_dict['gold'] = set_of_dicts[0]['gold']
+        new_dict['rationality'] = set_of_dicts[0]['rationality']
+        new_dict['text_candidates'] = set_of_dicts[0]['text_candidates']
+        # Now we want to aggregate the language_model_proba_df
+        # THIS HAS TO BE DONE ACCORDING TO A METHOD (max, weighted_avg, etc.)
+        set_of_dfs = [d['language_model_proba_df'] for d in set_of_dicts]
+
+        # Additional check of consistency
+        ref_index = set_of_dfs[0].index
+        ref_columns = set_of_dfs[0].columns
+
+        for t, df in enumerate(set_of_dfs[1:], start=2):
+            # Compare sets OR compare ordered lists
+            if not df.index.equals(ref_index):
+                raise ValueError(
+                    f"DataFrame #{i} index does not match the reference. "
+                    f"Expected {list(ref_index)}, got {list(df.index)}."
+                )
+            if not df.columns.equals(ref_columns):
+                raise ValueError(
+                    f"DataFrame #{i} columns do not match the reference. "
+                    f"Expected {list(ref_columns)}, got {list(df.columns)}."
+                )
+
+        if method == "mean":
+
+            # To aggregation safely
+            df_sum = reduce(operator.add, set_of_dfs)
+            df_agg = df_sum / len(set_of_dfs)
+
+        if method == "max":
+            df_agg = elementwise_max(set_of_dfs)
+
+        # Save it!
+        new_dict['language_model_proba_df'] = df_agg
+
+        # Save model names used as well
+        new_dict['model_names'] = model_names
+
+        results.append(new_dict)
+
+    results = {"results": results}
+    # Save the results
+    opt_dir = Path(f'data/agg_lms/')
+    if not opt_dir.exists():
+        opt_dir.mkdir(parents=True, exist_ok=True)
+    opt_path = Path(f"data/agg_lms/{filename}.pkl")
+    with open(opt_path, 'wb') as f:
+        pickle.dump(results, f)
 ########################################################################
