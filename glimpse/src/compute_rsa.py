@@ -126,8 +126,8 @@ def compute_rsa(summaries: pd.DataFrame, model, tokenizer, device,modName,datase
 
     gliUn_df = pd.DataFrame(gliUn_data)
     gliSp_df = pd.DataFrame(gliSp_data)    
-    gliUn_df.to_csv(f"{modName.split('/')[1]}_glimpseUnique_{datasetName.stem}.csv", index=False)
-    gliSp_df.to_csv(f"{modName.split('/')[1]}_glimpseSpeaker_{datasetName.stem}.csv", index=False)
+    gliUn_df.to_csv(f"producedSum/{modName.split('/')[1]}_glimpseUnique_{datasetName.stem}.csv", index=False)
+    gliSp_df.to_csv(f"producedSum/{modName.split('/')[1]}_glimpseSpeaker_{datasetName.stem}.csv", index=False)
 
     return results
 
