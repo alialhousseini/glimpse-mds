@@ -1,19 +1,24 @@
-from pathlib import Path
 
-import pandas as pd
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import argparse
+import os.path
+import sys
 from tqdm import tqdm
-
+import argparse
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import pandas as pd
+from pathlib import Path
+sys.path.append(os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '../..')))
 
 from rsasumm.rsa_reranker import RSAReranking
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name", type=str, default="facebook/bart-large-cnn")
+    parser.add_argument("--model_name", type=str,
+                        default="facebook/bart-large-cnn")
     parser.add_argument("--summaries", type=Path, default="")
     parser.add_argument("--output_dir", type=str, default="output")
-
+    parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--filter", type=str, default=None)
 
     parser.add_argument("--device", type=str, default="cuda")
@@ -21,22 +26,29 @@ def parse_args():
     return parser.parse_args()
 
 
-def parse_summaries(path : Path) -> pd.DataFrame:
+def parse_summaries(path: Path, limit: int) -> pd.DataFrame:
     summaries = pd.read_csv(path)
 
+    if limit is not None:
+        summaries = summaries.head(limit)
+
     # check if the dataframe has the right columns
-    if not all(col in summaries.columns for col in ["id", "id_text", "id_candidate", "summary"]):
-        raise ValueError("The dataframe must have columns ['id', 'id_text', 'id_candidate', 'summary']")
+    if not all(col in summaries.columns for col in ["id", "text", "id_candidate", "summary"]):
+        raise ValueError(
+            "The dataframe must have columns ['id', 'text', 'id_candidate', 'summary']")
 
     return summaries
 
-def reranking_rsa(summaries : pd.DataFrame, model, tokenizer, device):
+
+def reranking_rsa(summaries: pd.DataFrame, model, tokenizer, device):
 
     best_summaries = []
     best_bases = []
     for name, group in tqdm(summaries.groupby(["id"])):
-        rsa_reranker = RSAReranking(model, tokenizer, device, group.summary.unique().tolist(), group.text.unique().tolist())
-        best_rsa, best_base, speaker_df, listener_df, initial_listener, language_model_proba_df = rsa_reranker.rerank(t=3)
+        rsa_reranker = RSAReranking(model, tokenizer, group.summary.unique(
+        ).tolist(), group.text.unique().tolist(), 32, 1, device)
+        best_rsa, best_base, speaker_df, listener_df, initial_listener, _, _, language_model_proba_df = rsa_reranker.rerank(
+            t=3)
 
         group = group.set_index("summary")
         group_lines = group.loc[best_rsa]
@@ -55,7 +67,6 @@ def reranking_rsa(summaries : pd.DataFrame, model, tokenizer, device):
             group_lines['listener_proba'].loc[i] = listener_df.loc[text, summary]
             group_lines['language_model_proba'].loc[i] = language_model_proba_df.loc[text, summary]
             group_lines['initial_listener_proba'].loc[i] = initial_listener.loc[text, summary]
-
 
         group_lines["id"] = name
         best_summaries.append(group_lines)
@@ -76,7 +87,6 @@ def reranking_rsa(summaries : pd.DataFrame, model, tokenizer, device):
             best_base_lines['listener_proba'].loc[i] = listener_df.loc[text, summary]
             best_base_lines['language_model_proba'].loc[i] = language_model_proba_df.loc[text, summary]
             best_base_lines['initial_listener_proba'].loc[i] = initial_listener.loc[text, summary]
-
 
         best_base_lines["id"] = name
         best_bases.append(best_base_lines)
@@ -101,10 +111,11 @@ def main():
     model = model.to(args.device)
 
     # load the summaries
-    summaries = parse_summaries(args.summaries)
+    summaries = parse_summaries(args.summaries, args.limit)
 
     # rerank the summaries
-    best_summaries, bast_base = reranking_rsa(summaries, model, tokenizer, device=args.device)
+    best_summaries, bast_base = reranking_rsa(
+        summaries, model, tokenizer, device=args.device)
 
     best_summaries['metadata/reranking_model'] = args.model_name
     best_summaries['metadata/rsa_iterations'] = 3
@@ -112,12 +123,13 @@ def main():
     bast_base['metadata/reranking_model'] = args.model_name
     bast_base['metadata/rsa_iterations'] = 3
 
-
     # save the summaries
     # make the output directory if it does not exist
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-    output_path = Path(args.output_dir) / f"{args.summaries.stem}-_-rsa_reranked.csv"
-    output_path_base = Path(args.output_dir) / f"{args.summaries.stem}-_-base_reranked.csv"
+    output_path = Path(args.output_dir) / \
+        f"{args.summaries.stem}-_-rsa_reranked.csv"
+    output_path_base = Path(args.output_dir) / \
+        f"{args.summaries.stem}-_-base_reranked.csv"
 
     best_summaries.to_csv(output_path)
     bast_base.to_csv(output_path_base)

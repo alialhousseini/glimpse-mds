@@ -9,14 +9,30 @@ from tqdm import tqdm
 
 def kl_divergence(p, q):
     """
-    Compute the KL divergence between two distributions
+    Compute the KL divergence between two distributions.
+    KL(p || q) measures the divergence from distribution q to p.
+
+    Args:
+        p (torch.Tensor): Target probability distribution.
+        q (torch.Tensor): Approximate probability distribution.
+
+    Returns:
+        torch.Tensor: KL divergence values.
     """
     return torch.nan_to_num(p * (p / q).log(), nan=0.0).sum(-1)
 
 
 def jensen_shannon_divergence(p, q):
     """
-    Compute the Jensen-Shannon divergence between two distributions
+    Compute the Jensen-Shannon divergence between two distributions.
+    JS divergence is a symmetrized and smoothed version of KL divergence.
+
+    Args:
+        p (torch.Tensor): First probability distribution.
+        q (torch.Tensor): Second probability distribution.
+
+    Returns:
+        torch.Tensor: JS divergence values.
     """
     m = 0.5 * (p + q)
     return 0.5 * (kl_divergence(p, m) + kl_divergence(q, m))
@@ -57,6 +73,9 @@ class RSAReranking:
         self.batch_size = batch_size
         self.rationality = rationality
         self.likelihood_matrixPreComp = None
+
+        self.model.to(self.device)
+
     def compute_conditionned_likelihood(
             self, x: List[str], y: List[str], mean: bool = True
     ) -> torch.Tensor:
@@ -68,39 +87,67 @@ class RSAReranking:
         :param mean: average the likelihoods over the tokens of y or take the sum
         :return: tensor of shape (batch_size) containing the likelihoods of y given x
         """
+        # Dummy inputs
+        # source_texts = ["The paper is interesting."] -> 7 tokens
+        # candidate_summaries = ["Well-written summary."] -> 7 tokens not necessary to have the same number of tokens
+        assert len(x) == len(y)
 
-        assert len(x) == len(y), "x and y must have the same length"
-
+        # Define the loss function (cross-entropy for token-level predictions)
         loss_fn = torch.nn.CrossEntropyLoss(reduction="none")
-        batch_size = len(x)
 
-        x = self.tokenizer(x, return_tensors="pt", padding=True, truncation=True)
-        y = self.tokenizer(y, return_tensors="pt", padding=True, truncation=True)
-        # Concatenate the two inputs
-        # Compute the likelihood of y given x
+        # Tokenize the source texts (x) and summaries (y)
+        x = self.tokenizer(x, return_tensors="pt", padding=True,
+                           truncation=True).to(self.device)
+        y = self.tokenizer(y, return_tensors="pt", padding=True,
+                           truncation=True).to(self.device)
 
+        # Extract token IDs for input and output
         x_ids = x.input_ids.to(self.device)
         y_ids = y.input_ids.to(self.device)
+        x_attention_mask = x.attention_mask.to(self.device)
+        y_attention_mask = y.attention_mask.to(self.device)
+        # print(x_ids.shape, y_ids.shape) -> (1, 7) (1, 7)
+        # print(x_ids) -> tensor([[0,133,2225,16,2679,4,2]])
 
+        # Pass the inputs through the model
         logits = self.model(
             input_ids=x_ids,
             decoder_input_ids=y_ids,
-            attention_mask=x.attention_mask.to(self.device),
-            decoder_attention_mask=y.attention_mask.to(self.device),
+            attention_mask=x_attention_mask,
+            decoder_attention_mask=y_attention_mask,
         ).logits
-        # Compute the likelihood of y given x
 
+        # print(logits.shape) -> (1, 7, 50265)
+
+        # Shift logits and token IDs for loss computation
         shifted_logits = logits[..., :-1, :].contiguous()
         shifted_ids = y_ids[..., 1:].contiguous()
 
+        # print(shifted_logits.shape, shifted_ids.shape)
+        # Result: (1, 6, 50265) (1, 6)
+
+        # Compute token-level negative log-likelihood
+        # shifted logits has a size (batch_size, sequence_length, vocab_size)
+        # WE FLATTEN IT TO (batch_size x sequence_length, vocab_size)
         likelihood = -loss_fn(
-            shifted_logits.view(-1, shifted_logits.size(-1)), shifted_ids.view(-1)
+            shifted_logits.view(-1, shifted_logits.size(-1)  # (1x6, 50265)
+                                ), shifted_ids.view(-1)  # (1x6,)
         )
 
-        likelihood = likelihood.view(batch_size, -1).sum(-1)
-        if mean:
-            likelihood /= (y_ids != self.tokenizer.pad_token_id).float().sum(-1)
+        # print(likelihood.shape) -> [6] == (6,)
 
+        # Reshape the likelihood to match the batch
+        # Reshape back to (batch_size, sequence_length) then sum(-1) -> (batch_size,)
+        likelihood = likelihood.view(len(x["input_ids"]), -1).sum(-1)
+
+        # print(likelihood.shape) -> [1] == (1,)
+
+        # Normalize likelihood by the number of tokens if `mean=True`
+        if mean:
+            likelihood /= (y_ids !=
+                           self.tokenizer.pad_token_id).float().sum(-1)
+
+        # print(likelihood) = tensor([-6.6653])
         return likelihood
 
     def score(self, x: List[str], y: List[str], **kwargs):
@@ -108,19 +155,24 @@ class RSAReranking:
 
     def likelihood_matrix(self) -> torch.Tensor:
         """
-        :return: likelihood matrix : (world_size, num_candidates), likelihood[i, j] is the likelihood of
-        candidate j being a summary for source text i.
+        Compute a likelihood matrix where entry (i, j) is the likelihood of
+        candidate j summarizing source text i.
+
+        Returns:
+            torch.Tensor: Likelihood matrix of shape (len(source_texts), len(candidates)).
         """
+
+        # initialize the likelihood matrix of size (len(source_texts), len(candidates))
         likelihood_matrix = torch.zeros(
             (len(self.source_texts), len(self.candidates))
         ).to(self.device)
 
+        # create a list of pairs (i: index source, j: index candidate, source_text, candidate)
         pairs = []
         for i, source_text in enumerate(self.source_texts):
             for j, candidate in enumerate(self.candidates):
                 pairs.append((i, j, source_text, candidate))
 
-        # split the pairs into batches
         batches = [
             pairs[i: i + self.batch_size]
             for i in range(0, len(pairs), self.batch_size)
@@ -138,9 +190,11 @@ class RSAReranking:
                 )
 
             # fill the matrix
+            # update the likelihood matrix with the likelihoods
             for k, (i, j, _, _) in enumerate(batch):
                 likelihood_matrix[i, j] = likelihoods[k].detach()
 
+        # return the likelihood matrix
         return likelihood_matrix
 
     @cache
@@ -149,7 +203,9 @@ class RSAReranking:
             return self.initial_speaker_probas
         else:
             listener = self.L(t - 1)
-            prod = listener * self.rationality # + self.initial_speaker_probas.sum(0, keepdim=True)
+            # + self.initial_speaker_probas.sum(0, keepdim=True)
+            prod = listener * self.rationality
+            # Higher rationality focuses on selecting the most relevant candidates.
             return torch.log_softmax(prod, dim=-1)
 
     @cache
@@ -168,13 +224,15 @@ class RSAReranking:
         ) / len(self.source_texts)
 
         initital_consensuality_score = (
-                torch.exp(initial_listener_probas)
-                * (
-                        initial_listener_probas - torch.log(uniform_distribution_over_source_texts)
-                )
+            torch.exp(initial_listener_probas)
+            * (
+                initial_listener_probas -
+                torch.log(uniform_distribution_over_source_texts)
+            )
         ).sum(0).cpu().numpy()
 
-        initital_consensuality_score = pd.Series(initital_consensuality_score, index=self.candidates)
+        initital_consensuality_score = pd.Series(
+            initital_consensuality_score, index=self.candidates)
 
         initial_listener_probas = initial_listener_probas.cpu().numpy()
 
@@ -190,11 +248,12 @@ class RSAReranking:
         listener_df = pd.DataFrame(self.L(t).cpu().numpy())
 
         consensuality_scores = (
-                torch.exp(self.L(t))
-                * (self.L(t) - torch.log(uniform_distribution_over_source_texts))
+            torch.exp(self.L(t))
+            * (self.L(t) - torch.log(uniform_distribution_over_source_texts))
         ).sum(0).cpu().numpy()
 
-        consensuality_scores = pd.Series(consensuality_scores, index=self.candidates)
+        consensuality_scores = pd.Series(
+            consensuality_scores, index=self.candidates)
 
         S = self.S(t).cpu().numpy()
         speaker_df = pd.DataFrame(S)
@@ -211,7 +270,13 @@ class RSAReranking:
 
     def rerank(self, t=1, likelihoodMatrixPre = None):
         """
-        return the best summary (according to rsa) for each text
+        Rerank candidates after t iterations of RSA.
+
+        Args:
+            t (int): Number of RSA iterations.
+
+        Returns:
+            Tuple: Best RSA summary, speaker/listener probabilities, and consensuality scores.
         """
         self.likelihood_matrixPreComp = likelihoodMatrixPre
         (
@@ -255,4 +320,3 @@ class RSARerankingEmbedder(RSAReranking):
 
     def score(self, x: List[str], y: List[str], **kwargs):
         return self.compute_embeddings(x, y, **kwargs)
-

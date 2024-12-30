@@ -7,8 +7,10 @@ from tqdm import tqdm
 
 from pickle import dump
 
-import sys, os.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+import sys
+import os.path
+sys.path.append(os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '../..')))
 
 from rsasumm.rsa_reranker import RSAReranking
 import pickle
@@ -18,24 +20,28 @@ DESC = """
 Compute the RSA matrices for all the set of multi-document samples and dump these along with additional information in a pickle file.
 """
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
+
     #parser.add_argument("--model_name", type=str, default="google/pegasus-arxiv")facebook/bart-large-cn
     parser.add_argument("--model_name", type=str, default="facebook/bart-large-cn")
     parser.add_argument("--summaries_folder", type=Path, default="")
+
     parser.add_argument("--output_dir", type=str, default="output")
 
     parser.add_argument("--filter", type=str, default=None)
-    
+
     # if ran in a scripted way, the output path will be printed
-    parser.add_argument("--scripted-run", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--scripted-run", action=argparse.BooleanOptionalAction, default=False)
 
     parser.add_argument("--device", type=str, default="cuda")
     return parser.parse_args()
 
 
 def parse_summaries(path: Path) -> pd.DataFrame:
-    
+
     try:
         summaries = pd.read_csv(path)
     except:
@@ -50,6 +56,7 @@ def parse_summaries(path: Path) -> pd.DataFrame:
         )
 
     return summaries
+
 
 
 def consensus_scores_based_summaries(sample, n_consensus=3, n_dissensus=3):
@@ -70,6 +77,7 @@ def rsa_scores_based_summaries(sample, n_consensus=3, n_rsa_speaker=3):
     rsa = ".".join(rsa)
     
     return consensus + "\n\n" + rsa
+
 
 def compute_rsa(summaries: pd.DataFrame, model, tokenizer, device, modName, datasetName):
     probas_dir = "D:/Universita/Progetto NLP/model_evaluation/NLP-Project/preCompProb"
@@ -169,9 +177,11 @@ def main():
 
     model = model.to(args.device)
 
+
     for summary_file in os.listdir(args.summaries_folder):
         if summary_file.endswith(".csv"):
             summaries_path = Path(args.summaries_folder) / summary_file
+
 
             summaries = parse_summaries(summaries_path)
 
@@ -198,6 +208,7 @@ def main():
             summaries_path = Path(args.summaries_folder) / summary_file
 
             summaries = parse_summaries(summaries_path)
+
 
             results = compute_rsa(summaries, model, tokenizer, args.device, None, summary_file.split('.')[0])
 
