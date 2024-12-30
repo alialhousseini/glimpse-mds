@@ -1,7 +1,0 @@
-Id,summary,text,gold
-"('id1',)","Summary A.Summary C.Summary B
-
-Summary B.Summary C.Summary A",Text 1 Text 2 Text 3,invented_gold_value
-"('id2',)","Summary B.Summary A.Summary C
-
-Summary C.Summary A.Summary B",Text 1 Text 2 Text 3,invented_gold_value
