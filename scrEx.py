@@ -40,7 +40,7 @@ def main(dataset_path=None):
     except subprocess.CalledProcessError:
         print("Failed to generate extractive summaries.")
         sys.exit(1)"""
-    candidates = "D:\\Universita\\Progetto NLP\\model_evaluation\\NLP-Project\data\\candidates"
+    candidates = "D:\\Universita\\Progetto NLP\\model_evaluation\\NLP-Project\\finalCandidates"
 
     # Compute RSA scores
     try:
@@ -49,6 +49,8 @@ def main(dataset_path=None):
             "glimpse/src/compute_rsa.py",
             "--summaries_folder",
             candidates,
+            "--model_name",
+            "prova/BART"
         ]
         rsa_scores = subprocess.check_output(rsa_command).decode("utf-8").strip().split("\n")[-1]
         print(f"Computed RSA scores: {rsa_scores}")

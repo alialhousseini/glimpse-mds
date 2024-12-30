@@ -56,7 +56,7 @@ class RSAReranking:
 
         self.batch_size = batch_size
         self.rationality = rationality
-
+        self.likelihood_matrixPreComp = None
     def compute_conditionned_likelihood(
             self, x: List[str], y: List[str], mean: bool = True
     ) -> torch.Tensor:
@@ -158,7 +158,7 @@ class RSAReranking:
         return torch.log_softmax(speaker, dim=-2)
 
     def mk_listener_dataframe(self, t):
-        self.initial_speaker_probas = self.likelihood_matrix()
+        self.initial_speaker_probas = torch.tensor(self.likelihood_matrixPreComp.values).to(self.device)
 
         initial_listener_probas = self.L(0)
 
@@ -209,10 +209,11 @@ class RSAReranking:
 
         return listener_df, speaker_df, initial_listener_probas, initial_speaker_probas, initital_consensuality_score, consensuality_scores
 
-    def rerank(self, t=1):
+    def rerank(self, t=1, likelihoodMatrixPre = None):
         """
         return the best summary (according to rsa) for each text
         """
+        self.likelihood_matrixPreComp = likelihoodMatrixPre
         (
             listener_df,
             speaker_df,

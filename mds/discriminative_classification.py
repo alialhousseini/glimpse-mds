@@ -19,8 +19,8 @@ def parse_summaries(path : Path):
     # Load the data
     df = pd.read_csv(path)
 
-    if 'id' not in df.columns:
-        raise ValueError('id column not found in the summaries file')
+    if 'Id' not in df.columns:
+        raise ValueError('Id column not found in the summaries file')
     if 'text' not in df.columns:
         raise ValueError('text column not found in the summaries file')
     if 'summary' not in df.columns:
@@ -42,19 +42,18 @@ def compute_dot_products(df : pd.DataFrame, text_embeddings : torch.Tensor, summ
     df = df.reset_index()
     df['index'] = df.index
 
-    # group by id
-    grouped = df.groupby('id')
+    # group by Id
+    grouped = df.groupby('Id')
 
-    # for each id gather the id of the text and the summary
-    ids_per_sample = grouped.index.apply(list).tolist()
+    # for each Id gather the Id of the text and the summary
+    Ids_per_sample = grouped.index.apply(list).tolist()
 
     # compute the dot product between the text and the summary
-
     metrics = {'proba_of_success' : []}
-    for text_ids in ids_per_sample:
+    for text_Ids in Ids_per_sample:
         # shape (num_text, embedding_dim)
-        text_embedding = text_embeddings[text_ids]
-        summary_embedding = summary_embeddings[text_ids]
+        text_embedding = text_embeddings[text_Ids]
+        summary_embedding = summary_embeddings[text_Ids]
 
         # shape (num_text, num_text=num_summary)
         dot_product = torch.matmul(text_embedding, summary_embedding.T)
