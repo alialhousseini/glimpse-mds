@@ -14,10 +14,10 @@ def sanitize_model_name(model_name: str) -> str:
     return model_name.replace("/", "_")
 
 
-# logging.basicConfig(stream=stdout, level=logging.)
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--summaries", type=Path, default="")
+    parser.add_argument("--summaries_folder", type=Path, required=True, help="Folder containing summary files.")
+    parser.add_argument("--output_folder", type=Path, required=True, help="Folder to save the output metrics.")
 
     args = parser.parse_args()
     return args
@@ -85,38 +85,36 @@ def evaluate_rouge(
     return metrics
 
 
+def process_files_in_folder(input_folder: Path, output_folder: Path):
+    """
+    Process all summary files in a folder.
+    """
+    output_folder.mkdir(parents=True, exist_ok=True)
+
+    for summary_file in input_folder.glob("*.csv"):
+        print(f"Processing file: {summary_file.name}")
+
+        # Parse the summaries
+        df = parse_summaries(summary_file)
+
+        # Evaluate metrics
+        metrics = evaluate_rouge(df)
+        metrics_df = pd.DataFrame(metrics)
+
+        # Save results to a new file
+        output_path = output_folder / f"{summary_file.stem}_metrics.csv"
+        metrics_df.to_csv(output_path, index=False)
+        print(f"Saved metrics to: {output_path}")
+
 def main():
     args = parse_args()
 
-    # load the model
-    df = parse_summaries(args.summaries)
+    input_folder = args.summaries_folder
+    output_folder = args.output_folder
 
-    metrics = evaluate_rouge(df)
-
-
-    # # add index to the metrics
-    # metrics["index"] = [i for i in range(len(df))]
-
-    df = pd.DataFrame.from_dict(metrics)
-    df = df.add_prefix(f"common/")
-
-    # merge the metrics with the summaries
-
-    if args.summaries.exists():
-        df_old = parse_summaries(args.summaries)
-
-        for col in df.columns:
-            if col not in df_old.columns:
-                df_old[col] = float("nan")
-
-        # add entry to the dataframe
-        for col in df.columns:
-            df_old[col] = df[col]
-
-        df = df_old
-
-    df.to_csv(args.summaries, index=False)
+    print(input_folder)
+    process_files_in_folder(input_folder, output_folder)
 
 
-if __name__ == "__main__":
-    main()
+
+main()
