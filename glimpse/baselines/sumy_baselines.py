@@ -3,7 +3,7 @@ from sumy.parsers.html import HtmlParser
 from sumy.nlp.tokenizers import Tokenizer
 from sumy.nlp.stemmers import Stemmer
 from sumy.utils import get_stop_words
-
+from tqdm import tqdm
 import argparse
 
 import pandas as pd
@@ -57,32 +57,13 @@ def summarize(method, language, sentence_count, input_type, input_):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", default="")
-    # method
-    parser.add_argument("--method", type=str, choices=[
-                        'LSA', 'text-rank', 'lex-rank', 'edmundson', 'luhn', 'kl-sum', 'random', 'reduction'], default="LSA")
+    parser.add_argument("--input_folder", type=Path,  default="")
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--output", type=Path, default="")
+    parser.add_argument("--output_folder", type=Path, default="")
 
     args = parser.parse_args()
     return args
-
-
-def prepare_dataset(dataset_name, dataset_path="rsasumm/data/processed/"):
-    dataset_path = Path(dataset_path)
-    if dataset_name == "amazon":
-        dataset = pd.read_csv(dataset_path / "amazon_test.csv")
-    elif dataset_name == "space":
-        dataset = pd.read_csv(dataset_path / "space.csv")
-    elif dataset_name == "yelp":
-        dataset = pd.read_csv(dataset_path / "yelp_test.csv")
-    elif dataset_name == "reviews":
-        dataset = pd.read_csv(dataset_path / "test_metareviews.csv")
-    else:
-        raise ValueError(f"Unknown dataset {dataset_name}")
-
-    return dataset
 
 
 # group text by sample id and concatenate text
@@ -93,7 +74,10 @@ def group_text_by_id(df: pd.DataFrame) -> pd.DataFrame:
     :param df: The dataframe
     :return: The dataframe with the text grouped by the sample id
     """
-    texts = df.groupby("id")["text"].apply(lambda x: " ".join(x))
+    # Was written wrong! this way will repeat each text as many sentences we have
+    # texts = df.groupby("id")["text"].apply(lambda x: " ".join(x))
+
+    texts = df.groupby('id')['text'].unique().apply(lambda x: " ".join(x))
 
     # retrieve first gold by id
     gold = df.groupby("id")["gold"].first()
@@ -106,25 +90,35 @@ def group_text_by_id(df: pd.DataFrame) -> pd.DataFrame:
 
 def main():
     args = parse_args()
-    for N in [1]:
-        dataset = prepare_dataset(args.dataset)
-        # dataset = group_text_by_id(dataset)
 
-        summaries = []
-        for text in dataset.text:
-            summary = summarize(args.method, "english", N, "text", text)
-            summaries.append(summary)
+    methods = ['LSA', 'text-rank', 'lex-rank', 'edmundson',
+               'luhn', 'kl-sum', 'random', 'reduction']
 
-        dataset['summary'] = summaries
-        dataset['metadata/dataset'] = args.dataset
-        dataset["metadata/method"] = args.method
-        dataset["metadata/sentence_count"] = N
+    # Iterate over files in the input folder
+    for file in tqdm(args.input_folder.glob("*.csv")):
+        # For each, apply all methods and save summaries
 
-        name = f"{args.dataset}-_-{args.method}-_-sumy_{N}.csv"
-        path = Path(args.output) / name
+        # Read current dataset
+        dataset = pd.read_csv(file)
+        # Process it
+        # Concat all reviews , and return gold -> (sum_rev_i, gold)
+        dataset = group_text_by_id(dataset)
 
-        Path(args.output).mkdir(exist_ok=True, parents=True)
-        dataset.to_csv(path, index=True)
+        for method in tqdm(methods):
+            summaries = []
+            for text in dataset.text:
+                summary = summarize(method, "english", 1, "text", text)
+                summaries.append(summary)
+
+            dataset[f'summary_{method}'] = summaries
+
+        # Save the dataset
+        # create folder if not exists
+        if not Path(args.output_folder).exists():
+            Path(args.output_folder).mkdir(parents=True, exist_ok=True)
+        path_to_save = Path(args.output_folder) / \
+            Path(file.stem + "_summy.csv")
+        dataset.to_csv(path_to_save, index=True)
 
 
-# main()
+main()
