@@ -56,6 +56,19 @@ for k in info.keys():
         records['BERTscore'] = df['BERTScore'].mean()
         records['disc_per_char'] = df['proba_of_success'].mean()
 
+        records['ROUGE_1_width'] = round(
+            (1.96 * df['rouge1'].std())/np.sqrt(len(df)), 3)
+        records['ROUGE_2_width'] = round(
+            (1.96 * df['rouge2'].std())/np.sqrt(len(df)), 3)
+        records['ROUGE_L_width'] = round(
+            (1.96 * df['rougeL'].std())/np.sqrt(len(df)), 3)
+        records['ROUGE_LSum_width'] = round(
+            (1.96 * df['rougeLsum'].std())/np.sqrt(len(df)), 3)
+        records['BERTscore_width'] = round(
+            (1.96 * df['BERTScore'].std())/np.sqrt(len(df)), 3)
+        records['disc_per_char_width'] = round(
+            (1.96 * df['proba_of_success'].std())/np.sqrt(len(df)), 3)
+
         models_metrics_pairs[model_name] = records
     info[k] = models_metrics_pairs
 
@@ -81,6 +94,17 @@ for file in tqdm(summy_path.glob('*.csv')):
         for metric in metrics_col:
             info[name][method_name][metric] = df[f"{metric.split('_')[0]}_{method_name}"].mean(
             )
+            metric_mod = metric+'_width'
+
+            info[name][method_name][metric_mod] = round(
+                (1.96 * df[f"{metric.split('_')[0]}_{method_name}"].std())/np.sqrt(len(df)), 3)
+
+for k, v in info.items():
+    for model_name, metrics in v.items():
+        for metric_name, metric_value in metrics.items():
+            print(f"{k} - {model_name} - {metric_name} - {metric_value}")
+
+exit()
 
 for k, _ in info.items():
     for model_name, metrics in info[k].items():
@@ -120,6 +144,8 @@ def prepare_plot_data(nested_dict, level1_key):
     data = []
     for model_name, metrics in nested_dict[level1_key].items():
         for metric_name, metric_value in metrics.items():
+            if metric_name.endswith("_width"):
+                continue
             data.append(
                 {"Model": model_name, "Metric": metric_name, "Value": metric_value})
     return pd.DataFrame(data)
