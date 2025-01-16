@@ -286,31 +286,15 @@ class VectorRSAReranking:
         
         return torch.stack(result, dim=-1)
 
-    def mk_listener_dataframe(self, t):
+    def mk_listener_dataframe(self, t, agg_method):
         self.initial_speaker_probas = self.likelihood_matrix()
-
-        # TODO: consider other aggreggation methods (e.g. max, weighted average, etc.)        
-        initial_listener_probas = self.L(0).mean(dim=-1)
-
-        # Compute and return `initial_listener_probas` and other necessary components
-        initial_listener_probas = initial_listener_probas.cpu().numpy()
-        initial_listener_probas = pd.DataFrame(initial_listener_probas)
-        initial_listener_probas.index = self.source_texts
-        initial_listener_probas.columns = self.candidates
-
-        # TODO: consider other aggreggation methods (e.g. max, weighted average, etc.)        
-        initial_speaker_probas = self.S(0).mean(dim=-1)
-        initial_speaker_probas = initial_speaker_probas.numpy()
-        initial_speaker_probas = pd.DataFrame(initial_speaker_probas)
-        initial_speaker_probas.index = self.source_texts
-        initial_speaker_probas.columns = self.candidates
+        initial_listener_probas = self.L(0)
+        initial_speaker_probas = self.S(0)
 
         # compute consensus
         uniform_distribution_over_source_texts = torch.ones_like(
             initial_listener_probas
         ) / len(self.source_texts)
-
-        listener_df = pd.DataFrame(self.L(t).cpu().numpy().tolist())
 
         consensuality_scores = (
             (
@@ -320,14 +304,33 @@ class VectorRSAReranking:
             .sum(0).cpu().numpy()
         )
 
-        # Averaging the score over the models
-        # TODO: consider other aggreggation methods (e.g. max, weighted average, etc.)
-        consensuality_scores = consensuality_scores.mean(axis=1)
-        consensuality_scores = pd.Series(consensuality_scores, index=self.candidates)
+        # Aggregating the scores over the models
+        if agg_method=="mean":
+            initial_listener_probas = initial_listener_probas.mean(dim=-1).cpu().numpy()
+            initial_speaker_probas = initial_speaker_probas.mean(dim=-1).cpu().numpy()
+            consensuality_scores = consensuality_scores.mean(axis=1)
+            speaker_df = pd.DataFrame(self.S(t).mean(dim=-1).cpu().numpy().tolist())
+            listener_df = pd.DataFrame(self.L(t).mean(dim=-1).cpu().numpy().tolist())
+        elif agg_method=="max":
+            initial_listener_probas = initial_listener_probas.max(dim=-1).values.cpu().numpy()
+            initial_speaker_probas = initial_speaker_probas.max(dim=-1).values.cpu().numpy()
+            consensuality_scores = consensuality_scores.max(axis=1)
+            speaker_df = pd.DataFrame(self.S(t).max(dim=-1).values.cpu().numpy().tolist())
+            listener_df = pd.DataFrame(self.L(t).max(dim=-1).values.cpu().numpy().tolist())
 
-        # TODO: consider other aggreggation methods (e.g. max, weighted average, etc.)
-        speaker_scores = self.S(t).mean(dim=-1)
-        speaker_df = pd.DataFrame(speaker_scores.cpu().numpy().tolist())
+        else:
+            raise ValueError(f"agg_method must be either 'mean' or 'max', got: {agg_method}")
+
+        # Compute and return `initial_listener_probas` and other necessary components
+        initial_listener_probas = pd.DataFrame(initial_listener_probas)
+        initial_listener_probas.index = self.source_texts
+        initial_listener_probas.columns = self.candidates
+   
+        initial_speaker_probas = pd.DataFrame(initial_speaker_probas)
+        initial_speaker_probas.index = self.source_texts
+        initial_speaker_probas.columns = self.candidates
+        
+        consensuality_scores = pd.Series(consensuality_scores, index=self.candidates)
 
         listener_df.index = self.source_texts
         speaker_df.index = self.source_texts
@@ -337,7 +340,7 @@ class VectorRSAReranking:
 
         return listener_df, speaker_df, initial_listener_probas, initial_speaker_probas, None, consensuality_scores
 
-    def rerank(self, t=1):
+    def rerank(self, t=1, agg_method="mean"):
         """
         return the best summary (according to rsa) for each text
         """
@@ -348,7 +351,7 @@ class VectorRSAReranking:
             initial_speaker_proba,
             initital_consensuality_score,
             consensuality_scores,
-        ) = self.mk_listener_dataframe(t=t)
+        ) = self.mk_listener_dataframe(t=t, agg_method=agg_method)
         best_rsa = speaker_df.idxmax(axis=1).values
         best_base = initial_listener_proba.idxmax(axis=1).values
 
