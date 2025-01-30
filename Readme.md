@@ -1,6 +1,6 @@
 
 # Paper TITLE
-[Paper](https://arxiv.org/abs/2406.07359) | [Code](https://github.com/icannos/glimpse-mds)
+[Read The Paper](https://arxiv.org/abs/2406.07359)
 
 This repository contains the code and resources for our enhanced multi-document summarization project, building on the foundational work of the GLIMPSE paperwork <a href="#ref1">[1]</a> . Our extensions include various *new* mechanisms to enhance current results, and to improve the performance of summarization for scholarly reviews.
 
@@ -17,7 +17,7 @@ Multi-Document Summarization (MDS) is the process of automatically generating a 
 - We propose "GLIMPSE", our new project work for MDS using **RSA-based scoring mechanisms**. 
 - GLIMPSE generates more **informative and concise summaries** compared to existing consensus-based summarization models, thanks to the formulation of RSA as a **reference game**.
 
-![image](imgs\d1.jpg)
+![image](imgs/d1.jpg)
 
 ## General Architecture
 - The process starts by *pre-processing* a set of scholarly reviews
@@ -65,43 +65,71 @@ Finally, this vector is fed to the *Vector-RSA* framework to generate both `GUni
 
 ## Code Structure
 
-### Data
+### 1. Data
 This directory contains the required data to replicate this work.
 
 `data_to_process` contains the Top-226 selection of document reviews.
 
 `candidates` are the generated extractive and abstractive summaries 
 
-### Glimpse
+### 2. Glimpse
 
   #### Baselines
   Set of scripts to replicate SOTA techniques
   
   *Example usage:*
   ```python
-    python sumy_baselines.py --input_folder {folder_name} --batch_size 32 --device "cuda" --output_folder {folder_name}
+    python sumy_baselines.py 
+      --input_folder data/candidates/ 
+      --batch_size 32 
+      --device "cuda" 
+      --output_folder data/candidates_sumy/
   ```
 
   #### Data Loading
   Set of scripts to load original data, and to crawl required data from `open_review`
 
+  *Example usage:*
+  ```python
+    python data_preprocessing.py
+  ```
+
   #### Evaluate
   Set of scripts to evaluate a set of summaries
+  *Example usage:*
+  ```python
+    # Returns same datasets with an additional column containing the BERTScore
+    python evaluate_bartbert_metrics.py 
+      --input_folder data/candidates/ 
+      --output_folder data/candidates/
+  ```
 
-## Citation
+  #### Src
+  Set of scripts used for computing likelihood probabilities and RSA-based scores
 
-If you use this code, please cite the following papers:
+  *Example usage:*
+  ```python
+    python compute_rsa.py 
+      --input_folder {input_folder} 
+      --output_folder {output_folder} 
+      --model "facebook/bart-large-cn" --device "cuda"
+  ```
 
-```@misc{darrin2024glimpsepragmaticallyinformativemultidocument,
-      title={GLIMPSE: Pragmatically Informative Multi-Document Summarization for Scholarly Reviews}, 
-      author={Maxime Darrin and Ines Arous and Pablo Piantanida and Jackie CK Cheung},
-      year={2024},
-      eprint={2406.07359},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2406.07359}, 
-}
-```
+### 3. MDS
+MDS (Multi-document summarization) contains a set of folders to generate `GSpeaker` and `GUnique` summaries. The directory contains also some scripts for aggregating set of likelihood matrices.
+
+### 4. RSASUMM
+The RSA and Vect-RSA frameworks
+
+### Where to start
+It is highly recommended to follow the steps provided in `main_notebook.ipynb` where each step is documented, and results can be easily visualized
+
+
+
+## Acknowledgment
+
+We would like to extend our sincere gratitude to [Professor Luca Cagliero](https://www.polito.it/personale?p=023058) and Teaching Assistant [Lorenzo Vaiani](https://www.polito.it/personale?p=lorenzo.vaiani) for their invaluable guidance, support, and insights throughout the course of this project. Their expertise and encouragement have been instrumental in the successful completion of our work.
+
 
 ## References
 <a id="ref1">[1]</a> Maxime Darrin, Ines Arous, Pablo Piantanida, and Jackie Cheung. 2024. GLIMPSE: Pragmatically Informative Multi-Document Summarization for Scholarly Reviews. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)
