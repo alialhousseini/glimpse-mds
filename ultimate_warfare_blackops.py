@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 
-gspeaker_path = Path('allSummariesGUnique/')
+gspeaker_path = Path('GLSUNIQUESEAHORSE/')
 info = {}
 
 for file in tqdm(gspeaker_path.glob('*.csv')):
@@ -49,28 +49,35 @@ for k in info.keys():
         df = pd.read_csv(file)
         df["summary_char_count"] = df["summary"].apply(len)
         df['proba_of_success'] = df['proba_of_success'] / df['summary_char_count']
-        records['ROUGE_1'] = df['rouge1'].mean()
-        records['ROUGE_2'] = df['rouge2'].mean()
-        records['ROUGE_L'] = df['rougeL'].mean()
-        records['ROUGE_LSum'] = df['rougeLsum'].mean()
-        records['BERTscore'] = df['BERTScore'].mean()
+        # records['ROUGE_1'] = df['rouge1'].mean()
+        # records['ROUGE_2'] = df['rouge2'].mean()
+        # records['ROUGE_L'] = df['rougeL'].mean()
+        # records['ROUGE_LSum'] = df['rougeLsum'].mean()
+        # records['BERTscore'] = df['BERTScore'].mean()
+        records['repitition'] = df['repetition/proba_1_repetition'].mean()
+        records['grammar'] = df['grammar/proba_1_grammar'].mean()
+        records['attribution'] = df['attribution/proba_1_attribution'].mean()
+        records['main_ideas'] = df['main ideas/proba_1_main ideas'].mean()
+        try:
+            records['conciseness'] = df['conciseness/proba_1_conciseness'].mean()
+        except:
+            print(f"Error in {file.stem}")
         records['disc_per_char'] = df['proba_of_success'].mean()
         records['coherence'] = df['coherence'].mean()
         records['consistency'] = df['consistency'].mean()
         records['fluency'] = df['fluency'].mean()
-
-        records['ROUGE_1_width'] = round(
-            (1.96 * df['rouge1'].std())/np.sqrt(len(df)), 3)
-        records['ROUGE_2_width'] = round(
-            (1.96 * df['rouge2'].std())/np.sqrt(len(df)), 3)
-        records['ROUGE_L_width'] = round(
-            (1.96 * df['rougeL'].std())/np.sqrt(len(df)), 3)
-        records['ROUGE_LSum_width'] = round(
-            (1.96 * df['rougeLsum'].std())/np.sqrt(len(df)), 3)
-        records['BERTscore_width'] = round(
-            (1.96 * df['BERTScore'].std())/np.sqrt(len(df)), 3)
-        records['disc_per_char_width'] = round(
-            (1.96 * df['proba_of_success'].std())/np.sqrt(len(df)), 3)
+        # records['ROUGE_1_width'] = round(
+        #     (1.96 * df['rouge1'].std())/np.sqrt(len(df)), 3)
+        # records['ROUGE_2_width'] = round(
+        #     (1.96 * df['rouge2'].std())/np.sqrt(len(df)), 3)
+        # records['ROUGE_L_width'] = round(
+        #     (1.96 * df['rougeL'].std())/np.sqrt(len(df)), 3)
+        # records['ROUGE_LSum_width'] = round(
+        #     (1.96 * df['rougeLsum'].std())/np.sqrt(len(df)), 3)
+        # records['BERTscore_width'] = round(
+        #     (1.96 * df['BERTScore'].std())/np.sqrt(len(df)), 3)
+        # records['disc_per_char_width'] = round(
+        #     (1.96 * df['proba_of_success'].std())/np.sqrt(len(df)), 3)
 
         models_metrics_pairs[model_name] = records
     info[k] = models_metrics_pairs
@@ -166,7 +173,7 @@ for level1_key in info.keys():
                         ha='center', va='bottom', fontsize=8, color='black', rotation=90)
 
     plt.title(
-        f"Metrics Comparison for {level1_key.split('-_-')[0]} - Glimpse Unique", fontsize=16)
+        f"Metrics Comparison for {level1_key.split('-_-')[0]} - Glimpse Speaker", fontsize=16)
     plt.xlabel("Model", fontsize=14)
     plt.ylabel("Metric Value", fontsize=14)
     plt.xticks(rotation=45, ha="right", fontsize=12)

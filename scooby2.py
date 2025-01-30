@@ -12,7 +12,7 @@ def elementwise_max(dfs):
     """
     dfs: list of DataFrames (same index/columns)
     """
-    return reduce(lambda x, y: x.combine(y, func=max), dfs)
+    return reduce(lambda x, y: x.combine(y, func=lambda a, b: pd.Series([max(a_, b_) for a_, b_ in zip(a, b)])), dfs)
 
 # Now we can write a script that takes the set of LM_probas for each dataset and (set) of models
 # and aggregate them to get the final ranking
@@ -20,11 +20,9 @@ def elementwise_max(dfs):
 
 # We define a set of model names, this set represents the set of models we want to aggregate their results
 # In addition we define a methodology of aggregation(e.g. mean, max, weighted_avg, etc.)
-k = 3
-model_names = ["BART", "BART-XSUM", "Falcon",
-               "FlanT5-Large-FT-OAI", "LED-Large", "LED-Base",
-               "PEGASUS-Large", "PEGASUS-Arxiv", "PEGASUS-BigBird-Arxiv",
-               "PEGASUS-XSUM"]
+k = 5
+model_names = ["LED-Large", "PEGASUS-Large",
+               "PEGASUS-BigBird-Arxiv", "PEGASUS-XSUM", "FlanT5-Large-FT-OAI"]
 
 # lm_probas_path = Path("/content/drive/MyDrive/lm_probas")
 lm_probas_path = Path("data/lm_probas")
@@ -38,11 +36,12 @@ for comb in comb_list:
     # So we keep only the files that contain the models we are looking for
     lm_probas_path = Path("data/lm_probas")
     lm_probas_files = list(lm_probas_path.glob("*.pkl"))
+
     lm_probas_files = [file for file in lm_probas_files if any(
         model_name in file.stem.split('-_-')[-1] for model_name in comb)]
 
-    if len(lm_probas_files) // 4 <= 2:
-        raise ValueError("Not enough files to aggregate")
+    # if len(lm_probas_files) // 4 <= 2:
+    #     raise ValueError("Not enough files to aggregate")
 
     # Now for each file, we collect filenames together to be processed
     files_and_pickles = {}
@@ -108,9 +107,21 @@ for comb in comb_list:
                         f"Expected {list(ref_columns)}, got {list(df.columns)}."
                     )
 
+            for idx, df in enumerate(set_of_dfs):
+                if df.shape != set_of_dfs[0].shape:
+                    raise ValueError(
+                        f"Shape mismatch: DataFrame #{idx} has shape {df.shape}, expected {set_of_dfs[0].shape}")
+                if not df.index.equals(set_of_dfs[0].index):
+                    raise ValueError(
+                        f"Index mismatch: DataFrame #{idx} index does not match the reference.")
+                if not df.columns.equals(set_of_dfs[0].columns):
+                    raise ValueError(
+                        f"Column mismatch: DataFrame #{idx} columns do not match the reference.")
+
             # Combine data into a vector and save it in a new DF where each element
             # Is a list (vector)
             # Create a DataFrame where each cell is a list of integers
+
             df_concat = pd.DataFrame(
                 [[list(row) for row in zip(*[df.iloc[i].values for df in set_of_dfs])]
                  for i in range(set_of_dfs[0].shape[0])],
@@ -142,7 +153,7 @@ for comb in comb_list:
         # Save the results
         # CHANGE PATH BEFORE RUNNING
 
-        opt_dir = Path(f'data/aggs_lm')
+        opt_dir = Path(f'data/aggs_lm_vectorized/')
         if not opt_dir.exists():
             opt_dir.mkdir(parents=True, exist_ok=True)
         str_list_model_names = "["+str("_".join(list(comb)))+"]"
@@ -150,7 +161,7 @@ for comb in comb_list:
         new_filename = filename + "-_-" + str_list_model_names + "-_-" + method
 
         # CHANGE PATH BEFORE RUNNING
-        opt_path = Path(f"data/aggs_lm/{new_filename}.pkl")
+        opt_path = Path(f"data/aggs_lm_vectorized/{new_filename}.pkl")
         with open(opt_path, 'wb') as f:
             pickle.dump(results, f)
 
