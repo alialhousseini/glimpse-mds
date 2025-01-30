@@ -1,0 +1,5 @@
+This directory contains two files (scripts) that are very similar, they are used to generate visusalizations
+that to be used in the persentation of methodolgy.
+The script also prints all data shown in the paper as a NESTED-DICT 
+
+Just comment/uncomment what you want to see. 
