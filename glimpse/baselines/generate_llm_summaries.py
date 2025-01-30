@@ -1,3 +1,15 @@
+"""
+Generates summaries using the Llama-2-7B-32K-Instruct model.
+
+The script accepts 4 arguments:
+    --dataset (str): The path to the dataset file.
+    --batch_size (int): The batch size to use for generating the summaries. Default is 4.
+    --device (str): The device to use for generating the summaries. Default is "cuda".
+    --output (str): The path to the output directory where the generated summaries will be saved.
+    
+The script generates summaries for the dataset using the Llama-2-7B-32K-Instruct model and saves the generated summaries to the output directory.
+"""
+
 import pandas as pd
 from pathlib import Path
 

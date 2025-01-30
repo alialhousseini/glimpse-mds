@@ -1,25 +1,10 @@
-allSummariesGSpeakerAggsLM/
-allSummariesGUniqueAggsLM/
-COMMONGLSSPEAKER/
-COMMONGLSUNIQUE/
-BERTGLSSPEAKER/
-GLSUNIQUESEAHORSE/
-GLSSPEAKERSEAHORSE/
-BERTGLSUNIQUE/
-allSummariesGSpeaker/
-allSummariesGUnique/
-FullRsaEvao.ipynb
-Full*.ipynb
-pk*.ipynb   
-summ*/
-data/
+data_ignore/
 # Created by .ignore support plugin (hsz.mobi)
 ### Python template
 
 # GLIMPSE
 #  Ignore all the data except orignial files
 un*.py
-data/*
 !data/
 summaries/
 output/
