@@ -1,3 +1,12 @@
+""" 
+Similar to `rsa_reranker.py` but for vectorized-RSA reranking.
+In other words, here the probabilities are computed by a set of models, then aggregated to be as:
+P[summary|source] = P[{summary|source, model1}, {summary|source, model2}, {summary|source, model3} ... ]
+
+For this reason it is required a careful attention to handle this specific case alone.
+
+"""
+
 from functools import cache
 from typing import List
 import numpy as np
@@ -5,6 +14,7 @@ import torch
 import pandas as pd
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForMaskedLM, AutoModel
+
 
 class VectorRSAReranking:
     def __init__(
@@ -61,7 +71,8 @@ class VectorRSAReranking:
         shifted_ids = y_ids[..., 1:].contiguous()
 
         likelihood = -loss_fn(
-            shifted_logits.view(-1, shifted_logits.size(-1)), shifted_ids.view(-1)
+            shifted_logits.view(-1, shifted_logits.size(-1)
+                                ), shifted_ids.view(-1)
         )
         likelihood = likelihood.view(batch_size, -1).sum(-1)
 
@@ -88,11 +99,13 @@ class VectorRSAReranking:
             attention_mask=x.attention_mask.to(self.device),
         ).logits
 
-        shifted_logits = logits[:, -y_ids.shape[1]:, :].contiguous()  # focusing on the summary part
+        shifted_logits = logits[:, -y_ids.shape[1]:,
+                                :].contiguous()  # focusing on the summary part
         shifted_ids = y_ids.contiguous()
 
         likelihood = -loss_fn(
-            shifted_logits.view(-1, shifted_logits.size(-1)), shifted_ids.view(-1)
+            shifted_logits.view(-1, shifted_logits.size(-1)
+                                ), shifted_ids.view(-1)
         )
         likelihood = likelihood.view(batch_size, -1).sum(-1)
 
@@ -119,7 +132,8 @@ class VectorRSAReranking:
         input_ids = torch.cat([x_ids, y_ids], dim=1)
         attention_mask = torch.cat([x.attention_mask, y.attention_mask], dim=1)
 
-        logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
+        logits = model(input_ids=input_ids,
+                       attention_mask=attention_mask).logits
 
         # Focus on the summary part of the logits
         summary_length = y_ids.shape[1]
@@ -128,7 +142,8 @@ class VectorRSAReranking:
 
         # Compute likelihood for the summary
         likelihood = -loss_fn(
-            shifted_logits.view(-1, shifted_logits.size(-1)), shifted_ids.view(-1)
+            shifted_logits.view(-1, shifted_logits.size(-1)
+                                ), shifted_ids.view(-1)
         )
 
         likelihood = likelihood.view(batch_size, -1).sum(-1)
@@ -148,7 +163,7 @@ class VectorRSAReranking:
 
         # Add task-specific prefix (e.g., "summarize: ") to the source text
         x = ["summarize: " + text for text in x]
-        
+
         # Tokenize the source and candidate summary texts
         x = tokenizer(x, return_tensors="pt", padding=True, truncation=True)
         y = tokenizer(y, return_tensors="pt", padding=True, truncation=True)
@@ -170,7 +185,8 @@ class VectorRSAReranking:
 
         # Compute the likelihood (cross-entropy loss)
         likelihood = -loss_fn(
-            shifted_logits.view(-1, shifted_logits.size(-1)), shifted_ids.view(-1)
+            shifted_logits.view(-1, shifted_logits.size(-1)
+                                ), shifted_ids.view(-1)
         )
         likelihood = likelihood.view(batch_size, -1).sum(-1)
 
@@ -269,7 +285,7 @@ class VectorRSAReranking:
                 prod = current_layer * self.rationality
                 processed_layer = torch.log_softmax(prod, dim=-1)
                 result.append(processed_layer)
-            
+
             # Stack the processed layers into a single tensor
             # Shape will be [batch_size, num_classes, list_length]
             return torch.stack(result, dim=-1)
@@ -283,7 +299,7 @@ class VectorRSAReranking:
             current_layer = speaker[..., i]
             processed_layer = torch.log_softmax(current_layer, dim=-2)
             result.append(processed_layer)
-        
+
         return torch.stack(result, dim=-1)
 
     def mk_listener_dataframe(self, t, agg_method):
@@ -305,32 +321,42 @@ class VectorRSAReranking:
         )
 
         # Aggregating the scores over the models
-        if agg_method=="mean":
-            initial_listener_probas = initial_listener_probas.mean(dim=-1).cpu().numpy()
-            initial_speaker_probas = initial_speaker_probas.mean(dim=-1).cpu().numpy()
+        if agg_method == "mean":
+            initial_listener_probas = initial_listener_probas.mean(
+                dim=-1).cpu().numpy()
+            initial_speaker_probas = initial_speaker_probas.mean(
+                dim=-1).cpu().numpy()
             consensuality_scores = consensuality_scores.mean(axis=1)
-            speaker_df = pd.DataFrame(self.S(t).mean(dim=-1).cpu().numpy().tolist())
-            listener_df = pd.DataFrame(self.L(t).mean(dim=-1).cpu().numpy().tolist())
-        elif agg_method=="max":
-            initial_listener_probas = initial_listener_probas.max(dim=-1).values.cpu().numpy()
-            initial_speaker_probas = initial_speaker_probas.max(dim=-1).values.cpu().numpy()
+            speaker_df = pd.DataFrame(
+                self.S(t).mean(dim=-1).cpu().numpy().tolist())
+            listener_df = pd.DataFrame(
+                self.L(t).mean(dim=-1).cpu().numpy().tolist())
+        elif agg_method == "max":
+            initial_listener_probas = initial_listener_probas.max(
+                dim=-1).values.cpu().numpy()
+            initial_speaker_probas = initial_speaker_probas.max(
+                dim=-1).values.cpu().numpy()
             consensuality_scores = consensuality_scores.max(axis=1)
-            speaker_df = pd.DataFrame(self.S(t).max(dim=-1).values.cpu().numpy().tolist())
-            listener_df = pd.DataFrame(self.L(t).max(dim=-1).values.cpu().numpy().tolist())
+            speaker_df = pd.DataFrame(self.S(t).max(
+                dim=-1).values.cpu().numpy().tolist())
+            listener_df = pd.DataFrame(self.L(t).max(
+                dim=-1).values.cpu().numpy().tolist())
 
         else:
-            raise ValueError(f"agg_method must be either 'mean' or 'max', got: {agg_method}")
+            raise ValueError(
+                f"agg_method must be either 'mean' or 'max', got: {agg_method}")
 
         # Compute and return `initial_listener_probas` and other necessary components
         initial_listener_probas = pd.DataFrame(initial_listener_probas)
         initial_listener_probas.index = self.source_texts
         initial_listener_probas.columns = self.candidates
-   
+
         initial_speaker_probas = pd.DataFrame(initial_speaker_probas)
         initial_speaker_probas.index = self.source_texts
         initial_speaker_probas.columns = self.candidates
-        
-        consensuality_scores = pd.Series(consensuality_scores, index=self.candidates)
+
+        consensuality_scores = pd.Series(
+            consensuality_scores, index=self.candidates)
 
         listener_df.index = self.source_texts
         speaker_df.index = self.source_texts

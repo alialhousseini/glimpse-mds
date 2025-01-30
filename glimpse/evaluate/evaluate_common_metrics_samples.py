@@ -1,3 +1,8 @@
+"""
+Used to evaluate the performance of the models on the common metrics dataset. (ROUGE 1, ROUGE 2, ROUGE L, ROUGE Lsum)
+It reads the summary files from the input folder, evaluates the metrics and saves the results in the output folder.
+"""
+
 import argparse
 from pathlib import Path
 from tqdm import tqdm

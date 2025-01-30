@@ -1,3 +1,9 @@
+"""
+This script is used to generate the BERTScore for the summaries in the dataset.
+It iterates over set of datasets inside a folder, locate for each 'text' and 'summary' columns in the csv file.
+Generate the BERTScore for each summary and save the results in the same csv file.
+"""
+
 import argparse
 from pathlib import Path
 import pandas as pd

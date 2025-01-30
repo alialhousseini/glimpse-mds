@@ -1,3 +1,9 @@
+""" Main RSA Reranker script that is responsible for reranking the summaries using the RSA model.
+Iterates over the source texts and candidates to compute the likelihood matrix.
+The RSA model is then used to rerank the candidates and compute the speaker and listener probabilities.
+The RSA model is defined in the RSAReranking class.
+"""
+
 from functools import cache
 from typing import List
 
@@ -5,37 +11,6 @@ import numpy as np
 import torch
 import pandas as pd
 from tqdm import tqdm
-
-
-def kl_divergence(p, q):
-    """
-    Compute the KL divergence between two distributions.
-    KL(p || q) measures the divergence from distribution q to p.
-
-    Args:
-        p (torch.Tensor): Target probability distribution.
-        q (torch.Tensor): Approximate probability distribution.
-
-    Returns:
-        torch.Tensor: KL divergence values.
-    """
-    return torch.nan_to_num(p * (p / q).log(), nan=0.0).sum(-1)
-
-
-def jensen_shannon_divergence(p, q):
-    """
-    Compute the Jensen-Shannon divergence between two distributions.
-    JS divergence is a symmetrized and smoothed version of KL divergence.
-
-    Args:
-        p (torch.Tensor): First probability distribution.
-        q (torch.Tensor): Second probability distribution.
-
-    Returns:
-        torch.Tensor: JS divergence values.
-    """
-    m = 0.5 * (p + q)
-    return 0.5 * (kl_divergence(p, m) + kl_divergence(q, m))
 
 
 class RSAReranking:
@@ -301,23 +276,3 @@ class RSAReranking:
             initital_consensuality_score,
             consensuality_scores,
         )
-
-
-class RSARerankingEmbedder(RSAReranking):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def compute_embeddings(self, x: List[str], y: List[str], **kwargs):
-        model_kwargs = kwargs.get("model_kwargs")
-
-        # shape: (batch_size, embedding_dim)
-        x_embeddings = self.model.encode(x, **model_kwargs)
-        y_embeddings = self.model.encode(y, **model_kwargs)
-
-        # dot product between the embeddings : shape (batch_size)
-        dot_products = (x_embeddings * y_embeddings).sum(-1)
-
-        return dot_products
-
-    def score(self, x: List[str], y: List[str], **kwargs):
-        return self.compute_embeddings(x, y, **kwargs)

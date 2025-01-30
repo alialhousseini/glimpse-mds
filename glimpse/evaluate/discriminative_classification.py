@@ -1,3 +1,13 @@
+"""
+This script is responsible to generate the dsicriminative score, "Proba_of_success" for each summary in the dataset.
+This differs from `discriminative_classification_sumy` as this is used for the datasets of extractive & abstractive summaries.
+The reason behind separating the two scripts. Is that here our focus is to generate the discriminative score for the summaries while iterating over the dataset in a folder.
+While in the other case, different summarization techniques are used in a single csv file.
+
+The results obtained from this script are added in the column "Proba_of_success" in the dataset.
+Link: https://drive.google.com/drive/folders/1JyfLRWvLf0AW7dTBKZ6JtCBHJo9_JW0C?usp=drive_link
+"""
+
 from typing import Tuple
 import numpy as np
 import pandas as pd

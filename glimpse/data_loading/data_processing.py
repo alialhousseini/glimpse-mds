@@ -1,3 +1,11 @@
+"""
+This script is used to rename columns of the dataset and save it in a new directory.
+
+In our work we use datasets ranging from 2017 to 2021 (included)
+Please note that you can bring additional datasets from openreview.net (script provided)
+
+"""
+
 import pandas as pd
 import os
 

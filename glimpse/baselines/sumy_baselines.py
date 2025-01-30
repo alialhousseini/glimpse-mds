@@ -1,3 +1,31 @@
+"""
+This script is used to generate summaries using the sumy library.
+The goal of these summaries is to compare the performance of the Glimpse model with the performance of the sumy library.
+The script reads a dataset, groups the reviews by the sample id, and then generates summaries using the sumy library.
+The summaries are saved in a new dataset.
+
+The script receives the following arguments:
+    --input_folder (Path): The folder containing the datasets to be summarized.
+    --batch_size (int): The batch size to be used.
+    --device (str): The device to be used.
+    --output_folder (Path): The folder where the summarized datasets will be saved.
+
+The following summarization techniques are used:
+- LSA
+- TextRank
+- LexRank
+- Edmundson
+- Luhn
+- KL-Sum
+- Random
+- Reduction
+
+Link: https://drive.google.com/drive/folders/1klWLCFCtskgSyoQowL91ke3UAYVDUzz2?usp=sharing
+Here you can find 4 datasets ( the datasets for our work ) where summaries are generated using this script for each.
+Columns of interest: ['id', 'text', 'gold', 'summary_{method}']
+
+"""
+
 from sumy.parsers.plaintext import PlaintextParser
 from sumy.parsers.html import HtmlParser
 from sumy.nlp.tokenizers import Tokenizer

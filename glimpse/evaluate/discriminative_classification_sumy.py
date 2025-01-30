@@ -1,3 +1,14 @@
+"""
+THis script is responsible to generate "proba_of_success" metric for each summary in the dataset of sumy baselines.
+The generated columns are in the from "Proba_of_success_{method}" where method is the name of the summary method.
+The metric is computed as the dot product between the text embedding and the summary embedding.
+The script takes as input a folder containing the summary CSV files and a model to use for embedding.
+The output is a folder containing the same CSV files with the additional columns for the metrics.
+
+The results can be found here
+Link: https://drive.google.com/drive/folders/1klWLCFCtskgSyoQowL91ke3UAYVDUzz2?usp=sharing
+"""
+
 from typing import Tuple
 import numpy as np
 import pandas as pd

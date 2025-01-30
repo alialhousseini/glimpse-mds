@@ -1,3 +1,18 @@
+"""Main script for generating RSA matrices for multi-document summaries.
+
+The script uses the RSA Reranker to generate RSA matrices for multi-document summaries.
+The script also return most unique, and most speaker-like summaries for each group of summaries.
+
+Finally, all results will be saved separately in the folders `allSummariesGUnique` and `allSummariesGSpeaker`.
+
+The script can be run using the following command:
+```
+python compute_rsa.py --summaries_folder <path_to_summaries_folder> --output_dir <output_dir>
+```
+
+"""
+
+
 from rsasumm.rsa_reranker import RSAReranking
 import pickle
 from pathlib import Path
@@ -14,13 +29,11 @@ import os.path
 sys.path.append(os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../..')))
 
-from rsasumm.rsa_reranker import RSAReranking
-import pickle
-
 
 DESC = """
 Compute the RSA matrices for all the set of multi-document samples and dump these along with additional information in a pickle file.
 """
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -32,16 +45,17 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default="output")
 
     parser.add_argument("--filter", type=str, default=None)
-    
+
     # if ran in a scripted way, the output path will be printed
-    parser.add_argument("--scripted-run", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--scripted-run", action=argparse.BooleanOptionalAction, default=False)
 
     parser.add_argument("--device", type=str, default="cuda")
     return parser.parse_args()
 
 
 def parse_summaries(path: Path) -> pd.DataFrame:
-    
+
     try:
         summaries = pd.read_csv(path)
     except:
@@ -80,6 +94,7 @@ def rsa_scores_based_summaries(sample, n_consensus=3, n_rsa_speaker=3):
     rsa = ".".join(rsa)
 
     return consensus + "\n\n" + rsa
+
 
 def compute_rsa(summaries: pd.DataFrame, model, tokenizer, device, modName, datasetName):
     probas_dir = Path("data/lm_probas")
@@ -122,7 +137,7 @@ def compute_rsa(summaries: pd.DataFrame, model, tokenizer, device, modName, data
                         raise ValueError(
                             f"Mismatch in the order of candidate summaries.\nExpected: {candidate_summaries}\nFound: {likelihoodPreComp.columns.tolist()}"
                         )
-                                        
+
                     rsa_reranker = RSAReranking(
                         model,
                         tokenizer,
@@ -203,33 +218,6 @@ def compute_rsa(summaries: pd.DataFrame, model, tokenizer, device, modName, data
 
 def main():
     args = parse_args()
-    """model = AutoModelForSeq2SeqLM.from_pretrained("facebook/bart-large-cnn")
-    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
-
-    model = model.to(args.device)
-
-    for summary_file in os.listdir(args.summaries_folder):
-        if summary_file.endswith(".csv"):
-            summaries_path = Path(args.summaries_folder) / summary_file
-
-            summaries = parse_summaries(summaries_path)
-
-            results = compute_rsa(summaries, model, tokenizer, args.device, "facebook/bart-large-cnn", summaries_path)
-
-            results = {"results": results}
-
-            results["metadata/reranking_model"] = "facebook/bart-large-cnn"
-            results["metadata/rsa_iterations"] = 3
-
-            Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-            output_path = Path(args.output_dir) / f"{summaries_path.stem}-_-r3-_-rsa_reranked-facebook-bart-large-cnn.pk"
-            output_path_base = Path(args.output_dir) / f"{summaries_path.stem}-_-base_reranked.pk"
-
-            with open(output_path, "wb") as f:
-                dump(results, f)
-
-            if args.scripted_run: 
-                print(output_path)"""
     model = None
     tokenizer = None
     for summary_file in os.listdir(args.summaries_folder):

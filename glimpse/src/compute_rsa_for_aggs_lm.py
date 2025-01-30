@@ -1,3 +1,20 @@
+"""Main script for generating RSA matrices for multi-document summaries.
+
+The script uses the RSA Reranker to generate RSA matrices for multi-document summaries.
+The script also return most unique, and most speaker-like summaries for each group of summaries.
+
+Finally, all results will be saved separately in the folders `allSummariesGUnique` and `allSummariesGSpeaker`.
+
+The script can be run using the following command:
+```
+python compute_rsa_for_aggs_lm.py --summaries_folder <path_to_summaries_folder> --output_dir <output_dir>
+```
+
+The same as `compute_rsa.py` but with the addition of computing RSA for aggregated language models.
+
+
+"""
+
 from rsasumm.rsa_reranker import RSAReranking
 import pickle
 from pathlib import Path
@@ -203,33 +220,6 @@ def compute_rsa(summaries: pd.DataFrame, model, tokenizer, device, modName, data
 
 def main():
     args = parse_args()
-    """model = AutoModelForSeq2SeqLM.from_pretrained("facebook/bart-large-cnn")
-    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
-
-    model = model.to(args.device)
-
-    for summary_file in os.listdir(args.summaries_folder):
-        if summary_file.endswith(".csv"):
-            summaries_path = Path(args.summaries_folder) / summary_file
-
-            summaries = parse_summaries(summaries_path)
-
-            results = compute_rsa(summaries, model, tokenizer, args.device, "facebook/bart-large-cnn", summaries_path)
-
-            results = {"results": results}
-
-            results["metadata/reranking_model"] = "facebook/bart-large-cnn"
-            results["metadata/rsa_iterations"] = 3
-
-            Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-            output_path = Path(args.output_dir) / f"{summaries_path.stem}-_-r3-_-rsa_reranked-facebook-bart-large-cnn.pk"
-            output_path_base = Path(args.output_dir) / f"{summaries_path.stem}-_-base_reranked.pk"
-
-            with open(output_path, "wb") as f:
-                dump(results, f)
-
-            if args.scripted_run: 
-                print(output_path)"""
     model = None
     tokenizer = None
     for summary_file in os.listdir(args.summaries_folder):
