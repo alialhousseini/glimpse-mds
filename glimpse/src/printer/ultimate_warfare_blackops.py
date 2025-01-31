@@ -32,7 +32,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 
-gspeaker_path = Path('GLSUNIQUESEAHORSE/')
+gspeaker_path = Path(
+    'data_ignore/vectorRSA_resultsSEAHORSE')
 info = {}
 
 for file in tqdm(gspeaker_path.glob('*.csv')):
@@ -40,51 +41,99 @@ for file in tqdm(gspeaker_path.glob('*.csv')):
     if name not in info:
         info[name] = {}
 
-
 for k in info.keys():
-    models_metrics_pairs = {}
-    for file in gspeaker_path.glob(f'{k}-_-*.csv'):
-        records = {}  # key = metric, value = average of that value
-        model_name = file.stem.split('-_-')[1].split('_')[0]
-        df = pd.read_csv(file)
-        df["summary_char_count"] = df["summary"].apply(len)
-        df['proba_of_success'] = df['proba_of_success'] / df['summary_char_count']
-        # records['ROUGE_1'] = df['rouge1'].mean()
-        # records['ROUGE_2'] = df['rouge2'].mean()
-        # records['ROUGE_L'] = df['rougeL'].mean()
-        # records['ROUGE_LSum'] = df['rougeLsum'].mean()
-        # records['BERTscore'] = df['BERTScore'].mean()
-        records['repitition'] = df['repetition/proba_1_repetition'].mean()
-        records['grammar'] = df['grammar/proba_1_grammar'].mean()
-        records['attribution'] = df['attribution/proba_1_attribution'].mean()
-        records['main_ideas'] = df['main ideas/proba_1_main ideas'].mean()
-        try:
-            records['conciseness'] = df['conciseness/proba_1_conciseness'].mean()
-        except:
-            print(f"Error in {file.stem}")
-        records['disc_per_char'] = df['proba_of_success'].mean()
-        records['coherence'] = df['coherence'].mean()
-        records['consistency'] = df['consistency'].mean()
-        records['fluency'] = df['fluency'].mean()
-        # records['ROUGE_1_width'] = round(
-        #     (1.96 * df['rouge1'].std())/np.sqrt(len(df)), 3)
-        # records['ROUGE_2_width'] = round(
-        #     (1.96 * df['rouge2'].std())/np.sqrt(len(df)), 3)
-        # records['ROUGE_L_width'] = round(
-        #     (1.96 * df['rougeL'].std())/np.sqrt(len(df)), 3)
-        # records['ROUGE_LSum_width'] = round(
-        #     (1.96 * df['rougeLsum'].std())/np.sqrt(len(df)), 3)
-        # records['BERTscore_width'] = round(
-        #     (1.96 * df['BERTScore'].std())/np.sqrt(len(df)), 3)
-        # records['disc_per_char_width'] = round(
-        #     (1.96 * df['proba_of_success'].std())/np.sqrt(len(df)), 3)
+    file = list(gspeaker_path.glob(f'{k}-_-*.csv'))[0]
+    records = {}
+    df = pd.read_csv(file)
+    df["summary_char_count"] = df["summary"].apply(len)
+    df['proba_of_success'] = df['proba_of_success'] / df['summary_char_count']
+    records['ROUGE_1'] = df['rouge1'].mean()
+    records['ROUGE_2'] = df['rouge2'].mean()
+    records['ROUGE_L'] = df['rougeL'].mean()
+    records['BERTscore'] = df['BERTScore'].mean()
 
-        models_metrics_pairs[model_name] = records
-    info[k] = models_metrics_pairs
+    records['coherence'] = df['coherence'].mean()
+    records['consistency'] = df['consistency'].mean()
+    records['fluency'] = df['fluency'].mean()
+    records['discriminativeness'] = df['proba_of_success'].mean()
+    records['attribution'] = df['attribution/proba_1_attribution'].mean()
+    records['conciseness'] = df['conciseness/proba_1_conciseness'].mean()
+    records['grammar'] = df['grammar/proba_1_grammar'].mean()
+    records['main ideas'] = df['main ideas/proba_1_main ideas'].mean()
+    records['repetition'] = df['repetition/proba_1_repetition'].mean()
 
+    info[k] = records
+
+
+for model_name, v in info.items():
+    for metric, value in v.items():
+        print(f"{model_name} - {metric} - {value}")
+
+exit()
+
+# for k in info.keys():
+#     models_metrics_pairs = {}
+#     for file in gspeaker_path.glob(f'{k}-_-*.csv'):
+#         records = {}  # key = metric, value = average of that value
+#         model_name = file.stem.split('-_-')[1].split('_')[0]
+#         df = pd.read_csv(file)
+#         df["summary_char_count"] = df["summary"].apply(len)
+#         df['proba_of_success'] = df['proba_of_success'] / df['summary_char_count']
+#         # records['ROUGE_1'] = df['rouge1'].mean()
+#         # records['ROUGE_2'] = df['rouge2'].mean()
+#         # records['ROUGE_L'] = df['rougeL'].mean()
+#         # records['ROUGE_LSum'] = df['rougeLsum'].mean()
+#         records['BERTscore'] = df['BERTScore'].mean()
+#         records['repitition'] = df['repetition/proba_1_repetition'].mean()
+#         records['grammar'] = df['grammar/proba_1_grammar'].mean()
+#         records['attribution'] = df['attribution/proba_1_attribution'].mean()
+#         records['main_ideas'] = df['main ideas/proba_1_main ideas'].mean()
+#         try:
+#             records['conciseness'] = df['conciseness/proba_1_conciseness'].mean()
+#         except:
+#             print(f"Error in {file.stem}")
+#         records['disc_per_char'] = df['proba_of_success'].mean()
+#         records['coherence'] = df['coherence'].mean()
+#         records['consistency'] = df['consistency'].mean()
+#         records['fluency'] = df['fluency'].mean()
+#         # records['ROUGE_1_width'] = round(
+#         #     (1.96 * df['rouge1'].std())/np.sqrt(len(df)), 3)
+#         # records['ROUGE_2_width'] = round(
+#         #     (1.96 * df['rouge2'].std())/np.sqrt(len(df)), 3)
+#         # records['ROUGE_L_width'] = round(
+#         #     (1.96 * df['rougeL'].std())/np.sqrt(len(df)), 3)
+#         # records['ROUGE_LSum_width'] = round(
+#         #     (1.96 * df['rougeLsum'].std())/np.sqrt(len(df)), 3)
+#         # records['BERTscore_width'] = round(
+#         #     (1.96 * df['BERTScore'].std())/np.sqrt(len(df)), 3)
+#         # records['disc_per_char_width'] = round(
+#         #     (1.96 * df['proba_of_success'].std())/np.sqrt(len(df)), 3)
+
+#         models_metrics_pairs[model_name] = records
+#     info[k] = models_metrics_pairs
+
+# summy_path = Path('data_ignore/summy/')
+
+# for file in tqdm(summy_path.glob('*.csv')):
+#     name, _ = file.stem.split('_-_')
+#     if name not in info:
+#         info[name] = {}
+# for file in tqdm(summy_path.glob('*.csv')):
+#     name, _ = file.stem.split('_-_')
+#     df = pd.read_csv(file)
+#     metrics_col = [col for col in df.columns if col.split('_')[0] in [
+#         'coherence', 'consistency', 'fluency']]
+#     method_names = [col.split('_')[1] for col in metrics_col]
+#     method_names = list(set(method_names))
+
+#     for method_name in method_names:
+#         info[name][method_name] = {}
+#         for metric in metrics_col:
+#             info[name][method_name][metric] = df[f"{metric.split('_')[0]}_{method_name}"].mean(
+#             )
 
 # # SUMY LOOP
-# summy_path = Path('data/summy/')
+# summy_path = Path('data_ignore/summy/')
 # for file in tqdm(summy_path.glob('*.csv')):
 #     name, _ = file.stem.split('-_-')
 #     df = pd.read_csv(file)
@@ -142,41 +191,41 @@ for k, v in info.items():
 #         for metric_name, metric_value in metrics.items():
 #             print(f"{k} - {model_name} - {metric_name} - {metric_value}")
 # Setting up seaborn theme
-sns.set_theme(style="whitegrid")
+# sns.set_theme(style="whitegrid")
 
-# # Prepare data for plotting
-
-
-def prepare_plot_data(nested_dict, level1_key):
-    data = []
-    for model_name, metrics in nested_dict[level1_key].items():
-        for metric_name, metric_value in metrics.items():
-            if metric_name.endswith("_width"):
-                continue
-            data.append(
-                {"Model": model_name, "Metric": metric_name, "Value": metric_value})
-    return pd.DataFrame(data)
+# # # Prepare data for plotting
 
 
-# Updated code to avoid annotating 0.000 values
-for level1_key in info.keys():
-    df = prepare_plot_data(info, level1_key)
-    plt.figure(figsize=(14, 7))
-    ax = sns.barplot(data=df, x="Model", y="Value",
-                     hue="Metric", errorbar=None, dodge=True)
+# def prepare_plot_data(nested_dict, level1_key):
+#     data = []
+#     for model_name, metrics in nested_dict[level1_key].items():
+#         for metric_name, metric_value in metrics.items():
+#             if metric_name.endswith("_width"):
+#                 continue
+#             data.append(
+#                 {"Model": model_name, "Metric": metric_name, "Value": metric_value})
+#     return pd.DataFrame(data)
 
-    # Annotate values, skip 0.00001 values
-    for p in ax.patches:
-        if abs(p.get_height()) > 0.00001:  # Skip annotations for values close to 0
-            ax.annotate(f"{p.get_height():.3f}",
-                        (p.get_x() + p.get_width() / 2., p.get_height() + 0.005),
-                        ha='center', va='bottom', fontsize=8, color='black', rotation=90)
 
-    plt.title(
-        f"Metrics Comparison for {level1_key.split('-_-')[0]} - Glimpse Speaker", fontsize=16)
-    plt.xlabel("Model", fontsize=14)
-    plt.ylabel("Metric Value", fontsize=14)
-    plt.xticks(rotation=45, ha="right", fontsize=12)
-    plt.legend(title="Metric", bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.tight_layout()
-    plt.show()
+# # Updated code to avoid annotating 0.000 values
+# for level1_key in info.keys():
+#     df = prepare_plot_data(info, level1_key)
+#     plt.figure(figsize=(14, 7))
+#     ax = sns.barplot(data=df, x="Model", y="Value",
+#                      hue="Metric", errorbar=None, dodge=True)
+
+#     # Annotate values, skip 0.00001 values
+#     for p in ax.patches:
+#         if abs(p.get_height()) > 0.00001:  # Skip annotations for values close to 0
+#             ax.annotate(f"{p.get_height():.3f}",
+#                         (p.get_x() + p.get_width() / 2., p.get_height() + 0.005),
+#                         ha='center', va='bottom', fontsize=8, color='black', rotation=90)
+
+#     plt.title(
+#         f"Metrics Comparison for {level1_key.split('-_-')[0]} - Glimpse Speaker", fontsize=16)
+#     plt.xlabel("Model", fontsize=14)
+#     plt.ylabel("Metric Value", fontsize=14)
+#     plt.xticks(rotation=45, ha="right", fontsize=12)
+#     plt.legend(title="Metric", bbox_to_anchor=(1.05, 1), loc='upper left')
+#     plt.tight_layout()
+#     plt.show()
