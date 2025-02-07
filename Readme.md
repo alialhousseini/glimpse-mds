@@ -128,7 +128,7 @@ It is highly recommended to follow the steps provided in `main_notebook.ipynb` w
 
 ## Acknowledgment
 
-We would like to extend our sincere gratitude to [Professor Luca Cagliero](https://www.polito.it/personale?p=023058) and Teaching Assistant [Lorenzo Vaiani](https://www.polito.it/personale?p=lorenzo.vaiani) for their invaluable guidance, support, and insights throughout the course of this project. Their expertise and encouragement have been instrumental in the successful completion of our work.
+We would like to extend our sincere gratitude to Professor [Luca Cagliero](https://www.polito.it/personale?p=023058), Teaching Assistant [Lorenzo Vaiani](https://www.polito.it/personale?p=lorenzo.vaiani), Teaching Assistant [Giuseppe Gallipoli]([https://www.polito.it/personale?p=lorenzo.vaiani](https://www.polito.it/personale?p=giuseppe.gallipoli) for their invaluable guidance, support, and insights throughout the course of this project. Their expertise and encouragement have been instrumental in the successful completion of our work.
 
 
 ## References
