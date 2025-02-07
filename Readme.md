@@ -1,6 +1,6 @@
 
 # Multi-Model Rational Speech Act Framework for Scientific Peer Reviews Summarization
-[Read The Paper](https://arxiv.org/abs/2406.07359)
+[Read The Paper](https://github.com/alialhousseini/glimpse-mds/blob/main/other/paper/NLP_final.pdf)
 
 This repository contains the code and resources for our enhanced multi-document summarization project, building on the foundational work of the GLIMPSE paperwork <a href="#ref1">[1]</a> . Our extensions include various *new* mechanisms to enhance current results, and to improve the performance of summarization for scholarly reviews.
 
